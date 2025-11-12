@@ -19,7 +19,47 @@ curl http://localhost:8080/api/health
 
 Expected: `{"status":"ok"}`
 
-## 2. Create Participant
+## 2. Fetch Study Text
+
+```bash
+curl http://localhost:8080/api/study-text
+```
+
+Expected: `{"id":1,"version":"default","content":"Reading is a complex cognitive process..."}`
+
+With version parameter:
+
+```bash
+curl http://localhost:8080/api/study-text?version=default
+```
+
+## 3. Fetch Quiz Questions
+
+```bash
+curl http://localhost:8080/api/quiz-questions
+```
+
+Expected: Array of quiz questions:
+
+```json
+[
+  {
+    "id": "q1",
+    "prompt": "What is the purpose of this passage?",
+    "choices": ["To teach advanced speed-reading", "To test font readability and comprehension", ...],
+    "answer": 1
+  },
+  ...
+]
+```
+
+With study_text_id parameter:
+
+```bash
+curl http://localhost:8080/api/quiz-questions?study_text_id=1
+```
+
+## 4. Create Participant
 
 ```bash
 curl -X POST http://localhost:8080/api/participant \
@@ -31,7 +71,7 @@ Expected: `{"success":true,"id":1,"source":"test"}`
 
 **Save the participant ID** for next steps (e.g., `PARTICIPANT_ID=1`)
 
-## 3. Create Study Session
+## 5. Create Study Session
 
 ```bash
 curl -X POST http://localhost:8080/api/session \
@@ -57,7 +97,7 @@ Expected: `{"success":true,"session_id":"...","id":1}`
 
 **Save the session ID** for next steps (e.g., `SESSION_ID=1`)
 
-## 4. Submit Quiz Response
+## 6. Submit Quiz Response
 
 ```bash
 curl -X POST http://localhost:8080/api/quiz-response \
@@ -73,7 +113,7 @@ curl -X POST http://localhost:8080/api/quiz-response \
 
 Expected: `{"success":true,"id":1}`
 
-## 5. Submit Calibration Data
+## 7. Submit Calibration Data
 
 ```bash
 curl -X POST http://localhost:8080/api/calibration \
@@ -89,7 +129,7 @@ curl -X POST http://localhost:8080/api/calibration \
 
 Expected: `{"success":true,"id":1}`
 
-## 6. Submit Accuracy Measurement
+## 8. Submit Accuracy Measurement
 
 ```bash
 curl -X POST http://localhost:8080/api/accuracy \
@@ -104,7 +144,7 @@ curl -X POST http://localhost:8080/api/accuracy \
 
 Expected: `{"success":true,"id":1}`
 
-## 7. Submit Gaze Point
+## 9. Submit Gaze Point
 
 ```bash
 curl -X POST http://localhost:8080/api/gaze-point \
@@ -120,7 +160,7 @@ curl -X POST http://localhost:8080/api/gaze-point \
 
 Expected: `{"success":true,"id":1}`
 
-## 8. Submit Reading Event
+## 10. Submit Reading Event
 
 ```bash
 curl -X POST http://localhost:8080/api/reading-event \
@@ -146,6 +186,8 @@ After testing, check the database:
 Or query directly:
 
 ```bash
+sqlite3 readability.db "SELECT * FROM study_texts;"
+sqlite3 readability.db "SELECT * FROM quiz_questions;"
 sqlite3 readability.db "SELECT * FROM quiz_responses;"
 sqlite3 readability.db "SELECT * FROM calibration_data;"
 sqlite3 readability.db "SELECT * FROM accuracy_measurements;"

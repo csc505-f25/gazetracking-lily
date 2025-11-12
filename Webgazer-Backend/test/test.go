@@ -30,8 +30,32 @@ func main() {
 	fmt.Printf("Status: %s\n", resp.Status)
 	fmt.Printf("Response: %s\n\n", string(body))
 
-	// Test 2: Create a Study Session
-	fmt.Println("2. Creating a Study Session...")
+	// Test 2: Fetch Study Text
+	fmt.Println("2. Testing Fetch Study Text Endpoint...")
+	resp, err = http.Get(baseURL + "/api/study-text")
+	if err != nil {
+		fmt.Printf("❌ Error: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+	body, _ = io.ReadAll(resp.Body)
+	fmt.Printf("Status: %s\n", resp.Status)
+	fmt.Printf("Response: %s\n\n", string(body))
+
+	// Test 3: Fetch Quiz Questions
+	fmt.Println("3. Testing Fetch Quiz Questions Endpoint...")
+	resp, err = http.Get(baseURL + "/api/quiz-questions")
+	if err != nil {
+		fmt.Printf("❌ Error: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+	body, _ = io.ReadAll(resp.Body)
+	fmt.Printf("Status: %s\n", resp.Status)
+	fmt.Printf("Response: %s\n\n", string(body))
+
+	// Test 4: Create a Study Session
+	fmt.Println("4. Creating a Study Session...")
 	sessionData := map[string]interface{}{
 		"participant_id":     1,
 		"calibration_points": 25,
@@ -72,6 +96,8 @@ func main() {
 	fmt.Println("\n✅ All basic tests passed!")
 	fmt.Println("\nTo test with curl, use:")
 	fmt.Println("  curl http://localhost:8080/api/health")
+	fmt.Println("  curl http://localhost:8080/api/study-text")
+	fmt.Println("  curl http://localhost:8080/api/quiz-questions")
 	fmt.Println("  curl -X POST http://localhost:8080/api/session -H 'Content-Type: application/json' -d '{...}'")
 }
 

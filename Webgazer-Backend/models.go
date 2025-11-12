@@ -129,3 +129,32 @@ type ReadingEvent struct {
 	Session StudySession `gorm:"foreignKey:SessionID;references:ID" json:"session,omitempty"`
 }
 
+// StudyText represents a reading passage for the study
+type StudyText struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	Version   string    `gorm:"uniqueIndex;not null" json:"version"` // e.g., "v1", "default"
+	Content   string    `gorm:"type:text;not null" json:"content"`  // The reading passage
+	Active    bool      `gorm:"default:true" json:"active"`          // Whether this is the active version
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	
+	// Relationships
+	QuizQuestions []QuizQuestion `gorm:"foreignKey:StudyTextID;references:ID" json:"quiz_questions,omitempty"`
+}
+
+// QuizQuestion represents a quiz question for a study text
+type QuizQuestion struct {
+	ID         uint      `gorm:"primaryKey" json:"id"`
+	StudyTextID uint     `gorm:"index;not null" json:"study_text_id"`
+	QuestionID string    `gorm:"not null" json:"question_id"`  // e.g., "q1", "q2"
+	Prompt     string    `gorm:"type:text;not null" json:"prompt"`
+	Choices    string    `gorm:"type:text;not null" json:"choices"` // JSON array of choices
+	Answer     int       `gorm:"not null" json:"answer"`             // Index of correct answer (0-based)
+	Order      int       `gorm:"default:0" json:"order"`             // Display order
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	
+	// Relationship
+	StudyText StudyText `gorm:"foreignKey:StudyTextID;references:ID" json:"study_text,omitempty"`
+}
+

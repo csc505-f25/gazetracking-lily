@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { QUIZ } from '$lib/studyText';
+  import { onMount } from 'svelte';
+  import { fetchQuizQuestions, type QuizQuestionResponse } from '$lib/api';
   import { QuizQuestion } from '$lib/components/quiz';
   import { submitCompleteSession } from '$lib/api';
 
@@ -8,10 +9,26 @@
   let submitting = false;
   let submitError: string | null = null;
   let currentPage = 0;
+  let quizQuestions: QuizQuestionResponse[] = [];
+  let loading = true;
   const questionsPerPage = 5;
 
-  $: totalPages = Math.ceil(QUIZ.length / questionsPerPage);
-  $: currentQuestions = QUIZ.slice(
+  // Fetch quiz questions on mount
+  onMount(async () => {
+    const studyTextId = sessionStorage.getItem('study_text_id');
+    const questions = await fetchQuizQuestions(
+      studyTextId ? parseInt(studyTextId, 10) : undefined
+    );
+    if (questions.length > 0) {
+      quizQuestions = questions;
+    } else {
+      submitError = 'Failed to load quiz questions. Please refresh the page.';
+    }
+    loading = false;
+  });
+
+  $: totalPages = Math.ceil(quizQuestions.length / questionsPerPage);
+  $: currentQuestions = quizQuestions.slice(
     currentPage * questionsPerPage,
     (currentPage + 1) * questionsPerPage
   );
@@ -82,13 +99,23 @@
           </div>
         {/if}
 
-        {#each currentQuestions as q (q.id)}
-          <QuizQuestion
-            question={q}
-            answer={answers[q.id]}
-            onAnswerChange={handleAnswerChange}
-          />
-        {/each}
+        {#if loading}
+          <div class="text-center py-8">
+            <p class="text-gray-500">Loading quiz questions...</p>
+          </div>
+        {:else if currentQuestions.length === 0}
+          <div class="text-center py-8">
+            <p class="text-red-500">No quiz questions available.</p>
+          </div>
+        {:else}
+          {#each currentQuestions as q (q.id)}
+            <QuizQuestion
+              question={q}
+              answer={answers[q.id]}
+              onAnswerChange={handleAnswerChange}
+            />
+          {/each}
+        {/if}
 
         <div class="flex items-center justify-between pt-4">
           <button

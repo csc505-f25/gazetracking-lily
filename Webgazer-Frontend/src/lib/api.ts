@@ -4,6 +4,19 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
+export interface StudyTextResponse {
+	id: number;
+	version: string;
+	content: string;
+}
+
+export interface QuizQuestionResponse {
+	id: string;
+	prompt: string;
+	choices: string[];
+	answer: number;
+}
+
 export interface StudySessionData {
 	participant_id?: number;
 	session_id?: string;
@@ -259,6 +272,50 @@ export async function submitReadingEvent(data: {
 }
 
 /**
+ * Fetch study text from backend
+ */
+export async function fetchStudyText(version?: string): Promise<StudyTextResponse | null> {
+	try {
+		const url = version
+			? `${API_BASE_URL}/api/study-text?version=${version}`
+			: `${API_BASE_URL}/api/study-text`;
+
+		const response = await fetch(url);
+
+		if (!response.ok) {
+			throw new Error(`Failed to fetch study text: ${response.statusText}`);
+		}
+
+		return await response.json();
+	} catch (error) {
+		console.error('Error fetching study text:', error);
+		return null;
+	}
+}
+
+/**
+ * Fetch quiz questions from backend
+ */
+export async function fetchQuizQuestions(studyTextId?: number): Promise<QuizQuestionResponse[]> {
+	try {
+		const url = studyTextId
+			? `${API_BASE_URL}/api/quiz-questions?study_text_id=${studyTextId}`
+			: `${API_BASE_URL}/api/quiz-questions`;
+
+		const response = await fetch(url);
+
+		if (!response.ok) {
+			throw new Error(`Failed to fetch quiz questions: ${response.statusText}`);
+		}
+
+		return await response.json();
+	} catch (error) {
+		console.error('Error fetching quiz questions:', error);
+		return [];
+	}
+}
+
+/**
  * Collect all session data from sessionStorage and submit
  */
 export async function submitCompleteSession(quizAnswers: Record<string, number>): Promise<boolean> {
@@ -291,7 +348,12 @@ export async function submitCompleteSession(quizAnswers: Record<string, number>)
 		if (result.success && result.id) {
 			// Also submit individual quiz responses to the quiz_responses table
 			const sessionDbId = result.id;
-			const quizQuestions = await import('$lib/studyText').then((m) => m.QUIZ);
+
+			// Fetch quiz questions from API to get correct answers
+			const studyTextId = sessionStorage.getItem('study_text_id');
+			const quizQuestions = await fetchQuizQuestions(
+				studyTextId ? parseInt(studyTextId, 10) : undefined
+			);
 
 			// Submit each quiz response individually
 			const quizSubmissionPromises = [];

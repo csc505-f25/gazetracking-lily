@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
-  import { SAMPLE_TEXT } from '$lib/studyText';
+  import { fetchStudyText } from '$lib/api';
   import { WebGazerManager } from '$lib/components';
   import { ReadingPanel } from '$lib/components/reading';
 
@@ -13,11 +13,26 @@
   let timeA = 0;
   let timeB = 0;
   let fontPreference: 'A' | 'B' | null = null;
+  let studyText = '';
+  let loading = true;
 
   // randomly assign which side is Serif vs Sans
   const fonts: { left: 'serif' | 'sans', right: 'serif' | 'sans' } = Math.random() < 0.5
     ? { left: 'serif', right: 'sans' }
     : { left: 'sans', right: 'serif' };
+
+  // Fetch study text on mount
+  onMount(async () => {
+    const textData = await fetchStudyText();
+    if (textData) {
+      studyText = textData.content;
+      sessionStorage.setItem('study_text_id', String(textData.id));
+    } else {
+      // Fallback to empty or error message
+      studyText = 'Error loading study text. Please refresh the page.';
+    }
+    loading = false;
+  });
 
   function handleWebGazerInitialized(instance: any) {
     wgInstance = instance;
@@ -79,18 +94,23 @@
 />
 
 <div class="min-h-screen bg-white flex flex-col">
-  <div class="flex-1 flex flex-col items-center justify-center px-8 py-10">
-    <div class="flex-1 w-full flex flex-col items-center justify-center gap-8 px-8">
-      <div class="text-center mb-6">
-        <h1 class="text-4xl font-light text-gray-900 tracking-tight">Which font did you prefer?</h1>
-      </div>
-      
-      <div class="w-full flex items-center justify-center gap-70">
+  {#if loading}
+    <div class="flex-1 flex items-center justify-center">
+      <p class="text-gray-500">Loading study text...</p>
+    </div>
+  {:else}
+    <div class="flex-1 flex flex-col items-center justify-center px-8 py-10">
+      <div class="flex-1 w-full flex flex-col items-center justify-center gap-8 px-8">
+        <div class="text-center mb-6">
+          <h1 class="text-4xl font-light text-gray-900 tracking-tight">Which font did you prefer?</h1>
+        </div>
+        
+        <div class="w-full flex items-center justify-center gap-70">
         <div class="flex-1 max-w-xl flex flex-col items-center gap-8">
           <ReadingPanel
             label="Box A"
             fontType={fonts.left}
-            text={SAMPLE_TEXT}
+            text={studyText}
           />
           <button
             class="px-10 py-3 mt-5 rounded-lg border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
@@ -106,7 +126,7 @@
           <ReadingPanel
             label="Box B"
             fontType={fonts.right}
-            text={SAMPLE_TEXT}
+            text={studyText}
           />
           <button
             class="px-10 py-3 mt-5 rounded-lg border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
@@ -120,4 +140,5 @@
       </div>
     </div>
   </div>
+  {/if}
 </div>

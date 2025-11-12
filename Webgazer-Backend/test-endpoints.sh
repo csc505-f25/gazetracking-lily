@@ -60,7 +60,14 @@ test_endpoint() {
 # Test 1: Health Check
 test_endpoint "Health Check" "GET" "/api/health" ""
 
-# Test 2: Create Participant
+# Test 2: Fetch Study Text
+test_endpoint "Fetch Study Text" "GET" "/api/study-text" ""
+test_endpoint "Fetch Study Text (with version)" "GET" "/api/study-text?version=default" ""
+
+# Test 3: Fetch Quiz Questions
+test_endpoint "Fetch Quiz Questions" "GET" "/api/quiz-questions" ""
+
+# Test 4: Create Participant
 PARTICIPANT_DATA='{"source": "test"}'
 PARTICIPANT_RESPONSE=$(curl -s -X POST \
     -H "Content-Type: application/json" \
@@ -76,7 +83,7 @@ fi
 echo "  Using Participant ID: $PARTICIPANT_ID"
 echo ""
 
-# Test 3: Create Study Session
+# Test 5: Create Study Session
 SESSION_DATA="{
     \"participant_id\": $PARTICIPANT_ID,
     \"calibration_points\": 25,
@@ -106,7 +113,7 @@ fi
 echo "  Using Session ID: $SESSION_ID"
 echo ""
 
-# Test 4: Submit Quiz Response
+# Test 6: Submit Quiz Response
 QUIZ_RESPONSE_DATA="{
     \"session_id\": $SESSION_ID,
     \"question_id\": \"q1\",
@@ -116,7 +123,7 @@ QUIZ_RESPONSE_DATA="{
 }"
 test_endpoint "Submit Quiz Response" "POST" "/api/quiz-response" "$QUIZ_RESPONSE_DATA"
 
-# Test 5: Submit Calibration Data
+# Test 7: Submit Calibration Data
 CALIBRATION_DATA="{
     \"session_id\": $SESSION_ID,
     \"point_index\": 0,
@@ -126,7 +133,7 @@ CALIBRATION_DATA="{
 }"
 test_endpoint "Submit Calibration Data" "POST" "/api/calibration" "$CALIBRATION_DATA"
 
-# Test 6: Submit Accuracy Measurement
+# Test 8: Submit Accuracy Measurement
 ACCURACY_DATA="{
     \"session_id\": $SESSION_ID,
     \"accuracy\": 85.5,
@@ -135,7 +142,7 @@ ACCURACY_DATA="{
 }"
 test_endpoint "Submit Accuracy Measurement" "POST" "/api/accuracy" "$ACCURACY_DATA"
 
-# Test 7: Submit Gaze Point
+# Test 9: Submit Gaze Point
 GAZE_DATA="{
     \"session_id\": $SESSION_ID,
     \"x\": 500.2,
@@ -145,7 +152,7 @@ GAZE_DATA="{
 }"
 test_endpoint "Submit Gaze Point" "POST" "/api/gaze-point" "$GAZE_DATA"
 
-# Test 8: Submit Reading Event
+# Test 10: Submit Reading Event
 READING_EVENT_DATA="{
     \"session_id\": $SESSION_ID,
     \"event_type\": \"start\",

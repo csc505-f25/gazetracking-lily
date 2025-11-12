@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { QuizQ } from '$lib/studyText';
+  import type { QuizQuestionResponse } from '$lib/api';
 
-  export let question: QuizQ;
+  export let question: QuizQuestionResponse;
   export let answer: number | undefined = undefined;
   export let onAnswerChange: (questionId: string, answerIndex: number) => void;
 </script>
