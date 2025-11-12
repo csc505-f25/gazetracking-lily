@@ -18,9 +18,37 @@
     const currentState = get(webgazerStore);
     
     if (currentState.instance && currentState.isActive) {
-      console.log('WebGazer already active, skipping initialization');
+      console.log('WebGazer already active, reusing instance');
+      const instance = currentState.instance;
+      
+      // CRITICAL: Ensure video is enabled if requested
+      // The camera stream should already be active, we just need to show/hide the video element
+      try {
+        if (showVideo && instance.showVideo) {
+          instance.showVideo(true);
+        } else if (instance.showVideo) {
+          instance.showVideo(false);
+        }
+        if (instance.showFaceOverlay) instance.showFaceOverlay(showFaceOverlay);
+        if (instance.showFaceFeedbackBox) instance.showFaceFeedbackBox(showFaceFeedbackBox);
+        if (instance.showPredictionPoints) instance.showPredictionPoints(showPredictionPoints);
+      } catch (error) {
+        console.warn('Error updating WebGazer display settings:', error);
+      }
+      
+      // Always set up gaze listener to update the store
+      if (instance.setGazeListener) {
+        instance.setGazeListener((data: { x: number; y: number } | null) => {
+          if (data) {
+            updateGaze({ x: data.x, y: data.y });
+          } else {
+            updateGaze(null);
+          }
+        });
+      }
+      
       initialized = true;
-      onInitialized?.(currentState.instance);
+      onInitialized?.(instance);
       return;
     }
 

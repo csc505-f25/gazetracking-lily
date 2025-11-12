@@ -110,10 +110,12 @@
   }
 </script>
 
-{#if measuring}
-  <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-black" aria-hidden="true"></div>
-  <div class="absolute left-1/2 -translate-x-1/2 bottom-3 bg-gray-900 text-white text-sm px-3 py-1 rounded-md shadow">
-    Measuring accuracy… stare at the center dot for {(duration / 1000).toFixed(0)} seconds.
-  </div>
-{/if}
+<div class="relative w-full h-full">
+  {#if measuring}
+    <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-black" aria-hidden="true"></div>
+    <div class="absolute left-1/2 -translate-x-1/2 bottom-3 bg-gray-900 text-white text-sm px-3 py-1 rounded-md shadow">
+      Measuring accuracy… stare at the center dot for {(duration / 1000).toFixed(0)} seconds.
+    </div>
+  {/if}
+</div>
 

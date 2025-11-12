@@ -3,10 +3,11 @@
   import { goto } from '$app/navigation';
   import { webgazerStore } from '$lib/stores/webgazer';
   import { get } from 'svelte/store';
-  import { WebGazerManager } from '$lib/components';
+  import { WebGazerManager, Modal } from '$lib/components';
   import { AccuracyMeasurer, GazeOverlay } from '$lib/components/accuracy';
 
   const ACCURACY_THRESHOLD = 70;
+  const MEASUREMENT_DURATION = 5; // seconds
 
   let finished = false;
   let accuracy = 0;
@@ -14,8 +15,12 @@
   let wgInstance: any = null;
   let measuring = false;
   let webGazerReady = false;
+  let showInstructionModal = true;
+  let showResultModal = false;
 
   $: canContinue = finished && accuracy >= ACCURACY_THRESHOLD;
+  // Show gaze trail when WebGazer is ready and during measurement
+  $: showGazeTrail = webGazerReady && (measuring || !finished);
 
   // Check if WebGazer is already initialized from store
   onMount(() => {
@@ -63,25 +68,17 @@
     accuracy = acc;
     finished = true;
     measuring = false;
+    showResultModal = true;
 
-    if (accuracy < ACCURACY_THRESHOLD) {
-      const shouldRecalibrate = confirm(
-        `Accuracy is ${accuracy}% (< ${ACCURACY_THRESHOLD}%). Would you like to recalibrate?`
-      );
-      if (shouldRecalibrate) {
-        goto('/calibrate');
-      }
-    } else {
-      // Hide video & overlays now that accuracy check is complete
-      if (wgInstance) {
-        try {
-          wgInstance.showVideo(false)
-            .showFaceOverlay(false)
-            .showFaceFeedbackBox(false)
-            .showPredictionPoints(false);
-        } catch (error) {
-          console.warn('Error hiding overlays:', error);
-        }
+    // Hide video & overlays now that accuracy check is complete
+    if (wgInstance) {
+      try {
+        wgInstance.showVideo(false)
+          .showFaceOverlay(false)
+          .showFaceFeedbackBox(false)
+          .showPredictionPoints(false);
+      } catch (error) {
+        console.warn('Error hiding overlays:', error);
       }
     }
   }
@@ -95,6 +92,7 @@
     accuracy = 0;
     finished = false;
     measuring = false;
+    showResultModal = false;
     if (accuracyMeasurer) {
       accuracyMeasurer.reset();
       setTimeout(() => {
@@ -113,6 +111,22 @@
     await wgInstance.end();
     goto('/read');
   }
+
+  function closeInstructionModal() {
+    showInstructionModal = false;
+  }
+
+  function closeResultModal() {
+    showResultModal = false;
+  }
+
+  function handleRecalibrate() {
+    showResultModal = false;
+    goto('/calibrate');
+  }
+
+  $: accuracyMessage = `Please don't move your mouse & stare at the middle dot for the next ${MEASUREMENT_DURATION} seconds. This will allow us to calculate the accuracy of our predictions.`;
+  $: resultMessage = `Your accuracy measure is ${accuracy}%`;
 </script>
 
 <WebGazerManager
@@ -124,16 +138,40 @@
   onError={handleWebGazerError}
 />
 
-<div class="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10">
-  <div class="w-full max-w-3xl space-y-6 text-center">
-    <div class="space-y-2">
-      <h1 class="text-4xl font-light text-gray-900 tracking-tight">Accuracy Check</h1>
-      <p class="text-gray-600 font-light">
-        We'll measure the accuracy of your eye tracking calibration.
-      </p>
-    </div>
+<Modal
+  open={showInstructionModal}
+  title="Calculating measurement"
+  message={accuracyMessage}
+  buttonText="OK"
+  onClose={closeInstructionModal}
+/>
 
-    <div class="relative h-[65vh] border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 overflow-hidden">
+<Modal
+  open={showResultModal}
+  title=""
+  message={resultMessage}
+  buttonText="OK"
+  secondaryButtonText={accuracy < ACCURACY_THRESHOLD ? 'Recalibrate' : null}
+  onClose={closeResultModal}
+  onSecondaryClick={handleRecalibrate}
+/>
+
+<div class="h-screen bg-white flex flex-col overflow-hidden">
+  <!-- Header section - centered with max width -->
+  <div class="flex-shrink-0 w-full flex justify-center px-4 py-4">
+    <div class="w-full max-w-3xl space-y-3 text-center">
+      <div class="space-y-1">
+        <h1 class="text-3xl font-light text-gray-900 tracking-tight">Accuracy Check</h1>
+        <p class="text-sm text-gray-600 font-light">
+          We'll measure the accuracy of your eye tracking calibration.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Accuracy measurer - full width and height -->
+  <div class="flex-1 w-full px-4 pb-2 min-h-0">
+    <div class="relative w-full h-full border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 overflow-hidden">
       <AccuracyMeasurer
         bind:this={accuracyMeasurer}
         bind:measuring
@@ -142,10 +180,13 @@
         onError={handleAccuracyError}
       />
     </div>
+  </div>
 
-    <div class="space-y-2">
+  <!-- Controls section - centered with max width -->
+  <div class="flex-shrink-0 w-full flex justify-center px-4 py-3">
+    <div class="w-full max-w-3xl space-y-2 text-center">
       {#if finished}
-        <p class="text-gray-800">
+        <p class="text-gray-800 text-sm">
           Accuracy: <span class="font-medium">{accuracy}%</span>
           {#if accuracy < ACCURACY_THRESHOLD}
             <span class="text-red-600"> (below {ACCURACY_THRESHOLD}%)</span>
@@ -157,7 +198,7 @@
         {#if finished && accuracy < ACCURACY_THRESHOLD}
           <button
             on:click={() => goto('/calibrate')}
-            class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+            class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm"
           >
             Recalibrate
           </button>
@@ -165,7 +206,7 @@
         {#if finished}
           <button
             on:click={handleRetry}
-            class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+            class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm"
           >
             Retry Measurement
           </button>
@@ -173,7 +214,7 @@
         <button
           on:click={finish}
           disabled={!canContinue}
-          class="px-6 py-2 rounded-lg text-white shadow-sm transition-colors
+          class="px-6 py-2 rounded-lg text-white shadow-sm transition-colors text-sm
                  disabled:opacity-50 disabled:cursor-not-allowed
                  bg-gray-900 hover:bg-gray-800"
         >
@@ -190,5 +231,5 @@
   </div>
 </div>
 
-<GazeOverlay showTrail={measuring} trailLength={25} />
+<GazeOverlay showTrail={showGazeTrail} trailLength={25} />
 

@@ -123,16 +123,67 @@ export async function initializeWebGazer(
 		);
 	}
 
-	await wg
-		.setTracker('clmtrackr')
+	// CRITICAL: Configure WebGazer to request video stream
+	// Set showVideo FIRST to ensure WebGazer knows it needs video
+	wg.setTracker('clmtrackr')
 		.setRegression('ridge')
 		.applyKalmanFilter(true)
 		.saveDataAcrossSessions(true)
-		.showVideo(showVideo)
+		.showVideo(true) // Always request video initially, even if we hide it later
 		.showFaceOverlay(showFaceOverlay)
 		.showFaceFeedbackBox(showFaceFeedbackBox)
-		.showPredictionPoints(showPredictionPoints)
-		.begin();
+		.showPredictionPoints(showPredictionPoints);
+
+	// Set camera constraints AFTER showVideo to ensure video is requested correctly
+	// WebGazer needs to know video is required before constraints are set
+	wg.setCameraConstraints({
+		width: { ideal: 1280 },
+		height: { ideal: 720 },
+		facingMode: 'user'
+	});
+
+	// Patch WebGazer's getUserMedia to ensure video is always requested
+	// Some versions of WebGazer may not properly include video in constraints
+	const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+	navigator.mediaDevices.getUserMedia = function (constraints: MediaStreamConstraints) {
+		// Ensure constraints object exists
+		if (!constraints) {
+			constraints = { video: true };
+		}
+
+		// Ensure video is always requested
+		if (!constraints.video && !constraints.audio) {
+			constraints.video = true;
+		} else if (constraints.video === false && !constraints.audio) {
+			// If video is explicitly false but no audio, force video to true
+			constraints.video = true;
+		} else if (typeof constraints.video === 'object' && constraints.video !== null) {
+			// If video is an object (constraints), ensure it's truthy
+			// (it already is, so no change needed)
+		} else if (!constraints.video) {
+			// If video is falsy but audio exists, still add video
+			constraints.video = true;
+		}
+		return originalGetUserMedia(constraints);
+	};
+
+	// Now set the final video display state (after ensuring video is requested)
+	if (!showVideo) {
+		// Small delay to ensure video stream is established, then hide it
+		setTimeout(() => {
+			if (wg.showVideo) {
+				wg.showVideo(false);
+			}
+		}, 100);
+	}
+
+	// Now begin - this will call getUserMedia with the constraints we set
+	try {
+		await wg.begin();
+	} finally {
+		// Restore original getUserMedia after begin() completes
+		navigator.mediaDevices.getUserMedia = originalGetUserMedia;
+	}
 
 	if (onGaze) {
 		wg.setGazeListener((data: { x: number; y: number } | null) => {
@@ -143,12 +194,6 @@ export async function initializeWebGazer(
 			}
 		});
 	}
-
-	wg.setCameraConstraints({
-		width: { ideal: 1280 },
-		height: { ideal: 720 },
-		facingMode: 'user'
-	});
 
 	webgazerStore.update((state) => ({
 		...state,

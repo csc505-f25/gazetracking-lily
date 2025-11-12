@@ -11,6 +11,11 @@
 
   let unsubscribe: (() => void) | null = null;
 
+  // Clear trail when showTrail becomes false
+  $: if (!showTrail) {
+    gazeTrail = [];
+  }
+
   onMount(() => {
     unsubscribe = webgazerStore.subscribe((state) => {
       currentGaze = state.currentGaze;

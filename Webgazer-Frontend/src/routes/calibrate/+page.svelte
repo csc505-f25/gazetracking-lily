@@ -4,7 +4,7 @@
   import { CAL_POINTS } from '$lib/calibrationPoints';
   import { webgazerStore } from '$lib/stores/webgazer';
   import { get } from 'svelte/store';
-  import { WebGazerManager } from '$lib/components';
+  import { WebGazerManager, Modal } from '$lib/components';
   import { CalibrationGrid, ProgressBar } from '$lib/components/calibration';
 
   const CLICKS_PER_POINT = 5;
@@ -13,6 +13,7 @@
   let counts = Array(CAL_POINTS.length).fill(0);
   let wgInstance: any = null;
   let webGazerReady = false;
+  let showInstructionModal = true;
 
   $: totalClicks = counts.reduce((a, b) => a + b, 0);
   $: clickGoal = CLICKS_PER_POINT * CAL_POINTS.length;
@@ -90,6 +91,12 @@
     counts = Array(CAL_POINTS.length).fill(0);
     counts = [...counts]; // trigger reactivity
   }
+
+  function closeInstructionModal() {
+    showInstructionModal = false;
+  }
+
+  $: calibrationMessage = `Please click on each of the ${CAL_POINTS.length} points on the screen. You must click on each point ${CLICKS_PER_POINT} times till it goes yellow. This will calibrate your eye movements.`;
 </script>
 
 <WebGazerManager
@@ -101,39 +108,56 @@
   onError={handleWebGazerError}
 />
 
-<div class="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10">
-  <div class="w-full max-w-3xl space-y-6 text-center">
-    <div class="space-y-2">
-      <h1 class="text-4xl font-light text-gray-900 tracking-tight">Calibration</h1>
-      <p class="text-gray-600 font-light">
-        Click each dot <span class="font-medium">{CLICKS_PER_POINT}</span> times. Keep your head steady.
-      </p>
-    </div>
+<Modal
+  open={showInstructionModal}
+  title="Calibration"
+  message={calibrationMessage}
+  buttonText="OK"
+  onClose={closeInstructionModal}
+/>
 
-    <ProgressBar current={totalClicks} total={clickGoal} label="{totalClicks} / {clickGoal} clicks" />
-
-    {#if !webGazerReady}
-      <div class="text-center py-8">
-        <p class="text-gray-500">Initializing WebGazer... Please wait.</p>
+<div class="h-screen bg-white flex flex-col overflow-hidden">
+  <!-- Header section - centered with max width -->
+  <div class="flex-shrink-0 w-full flex justify-center px-4 py-4">
+    <div class="w-full max-w-3xl space-y-3 text-center">
+      <div class="space-y-1">
+        <h1 class="text-3xl font-light text-gray-900 tracking-tight">Calibration</h1>
+        <p class="text-sm text-gray-600 font-light">
+          Click each dot <span class="font-medium">{CLICKS_PER_POINT}</span> times. Keep your head steady.
+        </p>
       </div>
-    {/if}
-    
+
+      <ProgressBar current={totalClicks} total={clickGoal} label="{totalClicks} / {clickGoal} clicks" />
+
+      {#if !webGazerReady}
+        <div class="text-center py-2">
+          <p class="text-xs text-gray-500">Initializing WebGazer... Please wait.</p>
+        </div>
+      {/if}
+    </div>
+  </div>
+
+  <!-- Calibration grid - full width and height -->
+  <div class="flex-1 w-full px-4 pb-2 min-h-0">
     <CalibrationGrid
       clicksPerPoint={CLICKS_PER_POINT}
       counts={counts}
       onPointClick={handlePointClick}
     />
+  </div>
 
-    <div class="space-y-2">
+  <!-- Controls section - centered with max width -->
+  <div class="flex-shrink-0 w-full flex justify-center px-4 py-3">
+    <div class="w-full max-w-3xl space-y-2">
       <div class="flex items-center justify-center gap-3">
         <button
           on:click={reset}
-          class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+          class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm"
         >
           Clear calibration
         </button>
         {#if allPointsDone}
-          <p class="text-sm text-gray-600">Calibration complete! Proceeding to accuracy check...</p>
+          <p class="text-xs text-gray-600">Calibration complete! Proceeding to accuracy check...</p>
         {/if}
       </div>
     </div>
