@@ -2,9 +2,6 @@
   export let label: string;
   export let fontType: 'serif' | 'sans';
   export let text: string;
-  export let done: boolean = false;
-  export let onComplete: () => void;
-  export let disabled: boolean = false;
 
   function fontClass(kind: 'serif' | 'sans') {
     return kind === 'serif' ? 'font-serif' : 'font-sans';
