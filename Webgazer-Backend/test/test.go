@@ -54,6 +54,18 @@ func main() {
 	fmt.Printf("Status: %s\n", resp.Status)
 	fmt.Printf("Response: %s\n\n", string(body))
 
+	// Test 3a: Admin - List Study Texts
+	fmt.Println("3a. Testing Admin: List Study Texts Endpoint...")
+	resp, err = http.Get(baseURL + "/api/admin/study-text")
+	if err != nil {
+		fmt.Printf("❌ Error: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+	body, _ = io.ReadAll(resp.Body)
+	fmt.Printf("Status: %s\n", resp.Status)
+	fmt.Printf("Response: %s\n\n", string(body))
+
 	// Test 4: Create a Study Session
 	fmt.Println("4. Creating a Study Session...")
 	sessionData := map[string]interface{}{
@@ -98,6 +110,8 @@ func main() {
 	fmt.Println("  curl http://localhost:8080/api/health")
 	fmt.Println("  curl http://localhost:8080/api/study-text")
 	fmt.Println("  curl http://localhost:8080/api/quiz-questions")
+	fmt.Println("  curl http://localhost:8080/api/admin/study-text")
+	fmt.Println("  curl -X POST http://localhost:8080/api/admin/study-text -H 'Content-Type: application/json' -d '{\"content\":\"...\",\"font_left\":\"serif\",\"font_right\":\"sans\"}'")
 	fmt.Println("  curl -X POST http://localhost:8080/api/session -H 'Content-Type: application/json' -d '{...}'")
 }
 

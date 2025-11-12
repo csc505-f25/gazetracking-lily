@@ -64,6 +64,13 @@ test_endpoint "Health Check" "GET" "/api/health" ""
 test_endpoint "Fetch Study Text" "GET" "/api/study-text" ""
 test_endpoint "Fetch Study Text (with version)" "GET" "/api/study-text?version=default" ""
 
+# Test 2a: Admin - List Study Texts
+test_endpoint "Admin: List Study Texts" "GET" "/api/admin/study-text" ""
+
+# Test 2b: Admin - Create Study Text
+ADMIN_STUDY_TEXT_DATA='{"version":"test","content":"Test passage for endpoint testing","font_left":"serif","font_right":"sans","active":false}'
+test_endpoint "Admin: Create Study Text" "POST" "/api/admin/study-text" "$ADMIN_STUDY_TEXT_DATA"
+
 # Test 3: Fetch Quiz Questions
 test_endpoint "Fetch Quiz Questions" "GET" "/api/quiz-questions" ""
 
@@ -160,6 +167,20 @@ READING_EVENT_DATA="{
     \"duration\": 0
 }"
 test_endpoint "Submit Reading Event" "POST" "/api/reading-event" "$READING_EVENT_DATA"
+
+# Test 11: Admin - Get Quiz Question
+test_endpoint "Admin: Get Quiz Question" "GET" "/api/admin/quiz-question?id=1" ""
+
+# Test 12: Admin - Create Quiz Question
+ADMIN_QUIZ_DATA='{
+    "study_text_id": 1,
+    "question_id": "q_test",
+    "prompt": "Test question?",
+    "choices": ["A", "B", "C", "D"],
+    "answer": 0,
+    "order": 99
+}'
+test_endpoint "Admin: Create Quiz Question" "POST" "/api/admin/quiz-question" "$ADMIN_QUIZ_DATA"
 
 echo "=============================================="
 echo -e "${GREEN}All endpoint tests completed!${NC}"

@@ -356,9 +356,11 @@ func handleStudyText(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":      studyText.ID,
-		"version": studyText.Version,
-		"content": studyText.Content,
+		"id":         studyText.ID,
+		"version":    studyText.Version,
+		"content":    studyText.Content,
+		"font_left":  studyText.FontLeft,
+		"font_right": studyText.FontRight,
 	})
 }
 
@@ -447,6 +449,12 @@ func handleAdminStudyText(w http.ResponseWriter, r *http.Request) {
 		if studyText.Version == "" {
 			studyText.Version = "default"
 		}
+		if studyText.FontLeft == "" {
+			studyText.FontLeft = "serif"
+		}
+		if studyText.FontRight == "" {
+			studyText.FontRight = "sans"
+		}
 
 		// If this is set to active, deactivate all others
 		if studyText.Active {
@@ -468,10 +476,12 @@ func handleAdminStudyText(w http.ResponseWriter, r *http.Request) {
 	case "PUT":
 		// Update existing study text
 		var updateData struct {
-			ID      uint   `json:"id"`
-			Version string `json:"version,omitempty"`
-			Content string `json:"content,omitempty"`
-			Active  *bool  `json:"active,omitempty"`
+			ID        uint   `json:"id"`
+			Version   string `json:"version,omitempty"`
+			Content   string `json:"content,omitempty"`
+			FontLeft  string `json:"font_left,omitempty"`
+			FontRight string `json:"font_right,omitempty"`
+			Active    *bool  `json:"active,omitempty"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
@@ -496,6 +506,12 @@ func handleAdminStudyText(w http.ResponseWriter, r *http.Request) {
 		}
 		if updateData.Content != "" {
 			studyText.Content = updateData.Content
+		}
+		if updateData.FontLeft != "" {
+			studyText.FontLeft = updateData.FontLeft
+		}
+		if updateData.FontRight != "" {
+			studyText.FontRight = updateData.FontRight
 		}
 		if updateData.Active != nil {
 			// If setting to active, deactivate all others first

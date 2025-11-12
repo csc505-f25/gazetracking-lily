@@ -25,7 +25,17 @@ Expected: `{"status":"ok"}`
 curl http://localhost:8080/api/study-text
 ```
 
-Expected: `{"id":1,"version":"default","content":"Reading is a complex cognitive process..."}`
+Expected:
+
+```json
+{
+  "id": 1,
+  "version": "default",
+  "content": "Reading is a complex cognitive process...",
+  "font_left": "serif",
+  "font_right": "sans"
+}
+```
 
 With version parameter:
 
@@ -175,6 +185,137 @@ curl -X POST http://localhost:8080/api/reading-event \
 
 Expected: `{"success":true,"id":1}`
 
+## 11. Admin: List All Study Texts
+
+```bash
+curl http://localhost:8080/api/admin/study-text
+```
+
+Expected:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "version": "default",
+      "content": "Reading is a complex cognitive process...",
+      "font_left": "serif",
+      "font_right": "sans",
+      "active": true,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+## 12. Admin: Create Study Text
+
+```bash
+curl -X POST http://localhost:8080/api/admin/study-text \
+  -H "Content-Type: application/json" \
+  -d '{
+    "version": "v2",
+    "content": "Your new reading passage text here...",
+    "font_left": "serif",
+    "font_right": "sans",
+    "active": false
+  }'
+```
+
+Expected: `{"success":true,"id":2,"message":"Study text created successfully"}`
+
+## 13. Admin: Update Study Text
+
+```bash
+curl -X PUT http://localhost:8080/api/admin/study-text \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": 1,
+    "content": "Updated reading passage text...",
+    "font_left": "sans",
+    "font_right": "serif",
+    "active": true
+  }'
+```
+
+Expected: `{"success":true,"id":1,"message":"Study text updated successfully"}`
+
+## 14. Admin: Get Quiz Question
+
+```bash
+curl http://localhost:8080/api/admin/quiz-question?id=1
+```
+
+Expected:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "study_text_id": 1,
+    "question_id": "q1",
+    "prompt": "What is the purpose of this passage?",
+    "choices": ["Option 1", "Option 2", "Option 3", "Option 4"],
+    "answer": 1,
+    "order": 1
+  }
+}
+```
+
+## 15. Admin: Create Quiz Question
+
+```bash
+curl -X POST http://localhost:8080/api/admin/quiz-question \
+  -H "Content-Type: application/json" \
+  -d '{
+    "study_text_id": 1,
+    "question_id": "q6",
+    "prompt": "What is the main theme?",
+    "choices": [
+      "Theme A",
+      "Theme B",
+      "Theme C",
+      "Theme D"
+    ],
+    "answer": 0,
+    "order": 6
+  }'
+```
+
+Expected: `{"success":true,"id":6,"message":"Quiz question created successfully"}`
+
+## 16. Admin: Update Quiz Question
+
+```bash
+curl -X PUT http://localhost:8080/api/admin/quiz-question \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": 1,
+    "prompt": "Updated question prompt",
+    "choices": [
+      "New Option 1",
+      "New Option 2",
+      "New Option 3",
+      "New Option 4"
+    ],
+    "answer": 2
+  }'
+```
+
+Expected: `{"success":true,"id":1,"message":"Quiz question updated successfully"}`
+
+## 17. Admin: Delete Quiz Question
+
+```bash
+curl -X DELETE http://localhost:8080/api/admin/quiz-question?id=1
+```
+
+Expected: `{"success":true,"message":"Quiz question deleted successfully"}`
+
 ## Verify Data
 
 After testing, check the database:
@@ -186,7 +327,7 @@ After testing, check the database:
 Or query directly:
 
 ```bash
-sqlite3 readability.db "SELECT * FROM study_texts;"
+sqlite3 readability.db "SELECT id, version, font_left, font_right, active, substr(content, 1, 50) as content_preview FROM study_texts;"
 sqlite3 readability.db "SELECT * FROM quiz_questions;"
 sqlite3 readability.db "SELECT * FROM quiz_responses;"
 sqlite3 readability.db "SELECT * FROM calibration_data;"
@@ -194,6 +335,8 @@ sqlite3 readability.db "SELECT * FROM accuracy_measurements;"
 sqlite3 readability.db "SELECT * FROM gaze_points;"
 sqlite3 readability.db "SELECT * FROM reading_events;"
 ```
+
+**Note:** The `study_texts` table now includes `font_left` and `font_right` columns.
 
 ## Using jq for Pretty Output
 

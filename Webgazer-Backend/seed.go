@@ -15,11 +15,13 @@ func seedInitialData() {
 
 	// Create study text
 	studyText := StudyText{
-		Version: "default",
-		Content: `Reading is a complex cognitive process that involves decoding symbols to derive meaning.
+		Version:   "default",
+		Content:   `Reading is a complex cognitive process that involves decoding symbols to derive meaning.
 This brief passage is used purely for testing font readability and basic comprehension.
 Try to read at a natural pace without skimming, and focus on understanding the content.`,
-		Active: true,
+		FontLeft:  "serif",
+		FontRight: "sans",
+		Active:    true,
 	}
 
 	if err := db.Create(&studyText).Error; err != nil {

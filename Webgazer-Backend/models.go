@@ -134,6 +134,8 @@ type StudyText struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	Version   string    `gorm:"uniqueIndex;not null" json:"version"` // e.g., "v1", "default"
 	Content   string    `gorm:"type:text;not null" json:"content"`  // The reading passage
+	FontLeft  string    `gorm:"default:serif" json:"font_left"`      // Font for left panel: "serif" or "sans"
+	FontRight string    `gorm:"default:sans" json:"font_right"`      // Font for right panel: "serif" or "sans"
 	Active    bool      `gorm:"default:true" json:"active"`          // Whether this is the active version
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

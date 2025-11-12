@@ -15,11 +15,7 @@
   let fontPreference: 'A' | 'B' | null = null;
   let studyText = '';
   let loading = true;
-
-  // randomly assign which side is Serif vs Sans
-  const fonts: { left: 'serif' | 'sans', right: 'serif' | 'sans' } = Math.random() < 0.5
-    ? { left: 'serif', right: 'sans' }
-    : { left: 'sans', right: 'serif' };
+  let fonts: { left: 'serif' | 'sans', right: 'serif' | 'sans' } = { left: 'serif', right: 'sans' };
 
   // Fetch study text on mount
   onMount(async () => {
@@ -27,6 +23,19 @@
     if (textData) {
       studyText = textData.content;
       sessionStorage.setItem('study_text_id', String(textData.id));
+      
+      // Use fonts from API if provided, otherwise randomize
+      if (textData.font_left && textData.font_right) {
+        fonts = {
+          left: textData.font_left as 'serif' | 'sans',
+          right: textData.font_right as 'serif' | 'sans'
+        };
+      } else {
+        // Fallback to random assignment if not specified
+        fonts = Math.random() < 0.5
+          ? { left: 'serif', right: 'sans' }
+          : { left: 'sans', right: 'serif' };
+      }
     } else {
       // Fallback to empty or error message
       studyText = 'Error loading study text. Please refresh the page.';

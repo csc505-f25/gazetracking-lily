@@ -8,6 +8,8 @@ export interface StudyTextResponse {
 	id: number;
 	version: string;
 	content: string;
+	font_left?: string;
+	font_right?: string;
 }
 
 export interface QuizQuestionResponse {

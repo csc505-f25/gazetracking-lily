@@ -8,7 +8,6 @@ The easiest way to manage study text and quiz questions is using the terminal-ba
 
 ### Prerequisites
 
-
 1. **Start your backend server**:
    ```bash
    cd Webgazer-Backend
@@ -23,7 +22,7 @@ The easiest way to manage study text and quiz questions is using the terminal-ba
    ./admin-cli.sh
    ```
 
-3. **Navigate the menu**:
+2. **Navigate the menu**:
    - Enter a number (1-7) to select an option
    - Follow the prompts to enter data
    - Press Enter to continue after each operation
@@ -103,9 +102,19 @@ curl -X POST http://localhost:8080/api/admin/study-text \
   -d '{
     "version": "v2",
     "content": "Your new reading passage text here...",
+    "font_left": "serif",
+    "font_right": "sans",
     "active": false
   }'
 ```
+
+**Fields:**
+
+- `version` (string, optional) - Version identifier, defaults to "default"
+- `content` (string, required) - The reading passage text
+- `font_left` (string, optional) - Font for left panel: "serif" or "sans", defaults to "serif"
+- `font_right` (string, optional) - Font for right panel: "serif" or "sans", defaults to "sans"
+- `active` (boolean, optional) - Whether this is the active study text
 
 **Note:** If `active` is set to `true`, all other study texts will be automatically deactivated.
 
@@ -125,6 +134,8 @@ You can update any combination of:
 
 - `version` (string)
 - `content` (string)
+- `font_left` (string) - "serif" or "sans"
+- `font_right` (string) - "serif" or "sans"
 - `active` (boolean) - Setting to `true` will deactivate all others
 
 ### Example: Update Content Only
@@ -148,6 +159,20 @@ curl -X PUT http://localhost:8080/api/admin/study-text \
     "active": true
   }'
 ```
+
+### Example: Update Fonts Only
+
+```bash
+curl -X PUT http://localhost:8080/api/admin/study-text \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": 1,
+    "font_left": "sans",
+    "font_right": "serif"
+  }'
+```
+
+This will swap the fonts - left panel will show sans-serif, right panel will show serif.
 
 ## Quiz Question Management
 

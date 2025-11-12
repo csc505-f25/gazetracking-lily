@@ -122,7 +122,7 @@ list_study_texts() {
     local exit_code=$?
     
     if [[ $exit_code -eq 0 ]] && echo "$response" | jq -e '.success' > /dev/null 2>&1; then
-        echo "$response" | jq -r '.data[] | "ID: \(.id) | Version: \(.version) | Active: \(.active) | Content: \(.content[0:50])..."'
+        echo "$response" | jq -r '.data[] | "ID: \(.id) | Version: \(.version) | Fonts: \(.font_left)/\(.font_right) | Active: \(.active) | Content: \(.content[0:50])..."'
     else
         show_error "Failed to load study texts"
         if echo "$response" | grep -q "404"; then
@@ -142,6 +142,13 @@ create_study_text() {
     echo "Enter content (press Enter, then type content, end with Ctrl+D):"
     content=$(cat)
     
+    echo ""
+    echo "Font assignment (serif or sans):"
+    read -p "Font for left panel (default: serif): " font_left
+    font_left=${font_left:-serif}
+    read -p "Font for right panel (default: sans): " font_right
+    font_right=${font_right:-sans}
+    
     read -p "Set as active? (y/n): " active_choice
     active=false
     if [[ "$active_choice" == "y" || "$active_choice" == "Y" ]]; then
@@ -151,8 +158,10 @@ create_study_text() {
     data=$(jq -n \
         --arg version "$version" \
         --arg content "$content" \
+        --arg font_left "$font_left" \
+        --arg font_right "$font_right" \
         --argjson active "$active" \
-        '{version: $version, content: $content, active: $active}')
+        '{version: $version, content: $content, font_left: $font_left, font_right: $font_right, active: $active}')
     
     response=$(api_post "/api/admin/study-text" "$data")
     
@@ -178,6 +187,21 @@ update_study_text() {
     echo "New content (press Enter, then type content, end with Ctrl+D, or just Enter to skip):"
     content=$(cat)
     
+    echo ""
+    read -p "Update fonts? (y/n): " update_fonts
+    font_left_json="null"
+    font_right_json="null"
+    if [[ "$update_fonts" == "y" || "$update_fonts" == "Y" ]]; then
+        read -p "Font for left panel (serif/sans, press Enter to skip): " font_left
+        read -p "Font for right panel (serif/sans, press Enter to skip): " font_right
+        if [[ -n "$font_left" ]]; then
+            font_left_json="\"$font_left\""
+        fi
+        if [[ -n "$font_right" ]]; then
+            font_right_json="\"$font_right\""
+        fi
+    fi
+    
     read -p "Set as active? (y/n/skip): " active_choice
     active_json="null"
     if [[ "$active_choice" == "y" || "$active_choice" == "Y" ]]; then
@@ -190,10 +214,14 @@ update_study_text() {
         --argjson id "$id" \
         --arg version "$version" \
         --arg content "$content" \
+        --argjson font_left "$font_left_json" \
+        --argjson font_right "$font_right_json" \
         --argjson active "$active_json" \
         '{id: $id} + 
          (if $version != "" then {version: $version} else {} end) +
          (if $content != "" then {content: $content} else {} end) +
+         (if $font_left != null then {font_left: $font_left} else {} end) +
+         (if $font_right != null then {font_right: $font_right} else {} end) +
          (if $active != null then {active: $active} else {} end)')
     
     response=$(api_put "/api/admin/study-text" "$data")
