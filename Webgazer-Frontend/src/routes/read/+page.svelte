@@ -93,9 +93,6 @@
             label="Box A"
             fontType={fonts.left}
             text={SAMPLE_TEXT}
-            done={doneA}
-            onComplete={completeA}
-            disabled={!started}
           />
           <button
             class="px-6 py-3 mt-4 rounded-lg border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
@@ -112,9 +109,6 @@
             label="Box B"
             fontType={fonts.right}
             text={SAMPLE_TEXT}
-            done={doneB}
-            onComplete={completeB}
-            disabled={!started || !doneA}
           />
           <button
             class="px-6 py-3 mt-4 rounded-lg border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
