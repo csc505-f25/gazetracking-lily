@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
+	"strings"
 	"time"
 
-	"github.com/gorilla/handlers"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -41,29 +42,50 @@ func main() {
 
 	fmt.Println("Database initialized successfully")
 
-	// Setup routes
-	http.HandleFunc("/api/participant", handleParticipant)
-	http.HandleFunc("/api/session", handleSession)
-	http.HandleFunc("/api/quiz-response", handleQuizResponse)
-	http.HandleFunc("/api/calibration", handleCalibration)
-	http.HandleFunc("/api/gaze-point", handleGazePoint)
-	http.HandleFunc("/api/reading-event", handleReadingEvent)
-	http.HandleFunc("/api/accuracy", handleAccuracy)
-	http.HandleFunc("/api/study-text", handleStudyText)
-	http.HandleFunc("/api/quiz-questions", handleQuizQuestions)
-	http.HandleFunc("/api/admin/study-text", handleAdminStudyText)
-	http.HandleFunc("/api/admin/quiz-question", handleAdminQuizQuestion)
-	http.HandleFunc("/api/health", handleHealth)
-	
+	// Setup Gin router
+	router := gin.Default()
+
+	// Configure trusted proxies (security best practice)
+	// For local development, we don't trust any proxies
+	// In production, configure this based on your infrastructure
+	router.SetTrustedProxies(nil)
+
+	// Configure CORS middleware
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"http://localhost:5173", "http://localhost:4173", "http://localhost:3000"}
+	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	config.AllowHeaders = []string{"Content-Type"}
+	router.Use(cors.New(config))
+
+	// API routes
+	api := router.Group("/api")
+	{
+		api.POST("/participant", handleParticipant)
+		api.POST("/session", handleSession)
+		api.POST("/quiz-response", handleQuizResponse)
+		api.POST("/calibration", handleCalibration)
+		api.POST("/gaze-point", handleGazePoint)
+		api.POST("/reading-event", handleReadingEvent)
+		api.POST("/accuracy", handleAccuracy)
+		api.GET("/study-text", handleStudyText)
+		api.GET("/quiz-questions", handleQuizQuestions)
+		api.GET("/health", handleHealth)
+
+		// Admin routes
+		admin := api.Group("/admin")
+		{
+			admin.POST("/study-text", handleAdminStudyText)
+			admin.PUT("/study-text", handleAdminStudyText)
+			admin.GET("/study-text", handleAdminStudyText)
+			admin.POST("/quiz-question", handleAdminQuizQuestion)
+			admin.PUT("/quiz-question", handleAdminQuizQuestion)
+			admin.DELETE("/quiz-question", handleAdminQuizQuestion)
+			admin.GET("/quiz-question", handleAdminQuizQuestion)
+		}
+	}
+
 	// Seed initial data if database is empty
 	seedInitialData()
-
-	// CORS middleware
-	corsHandler := handlers.CORS(
-		handlers.AllowedOrigins([]string{"http://localhost:5173", "http://localhost:4173", "http://localhost:3000"}),
-		handlers.AllowedMethods([]string{"GET", "POST", "OPTIONS"}),
-		handlers.AllowedHeaders([]string{"Content-Type"}),
-	)(http.DefaultServeMux)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -71,28 +93,17 @@ func main() {
 	}
 
 	fmt.Printf("Server starting on port %s\n", port)
-	log.Fatal(http.ListenAndServe(":"+port, corsHandler))
+	log.Fatal(router.Run(":" + port))
 }
 
-func handleHealth(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+func handleHealth(c *gin.Context) {
+	c.JSON(200, gin.H{"status": "ok"})
 }
 
-func handleParticipant(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func handleParticipant(c *gin.Context) {
 	var participant Participant
-	if err := json.NewDecoder(r.Body).Decode(&participant); err != nil {
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&participant); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
 		return
 	}
 
@@ -103,65 +114,41 @@ func handleParticipant(w http.ResponseWriter, r *http.Request) {
 
 	// Create participant in database
 	if err := db.Create(&participant).Error; err != nil {
-		http.Error(w, "Failed to save participant: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Failed to save participant: " + err.Error()})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	c.JSON(201, gin.H{
 		"success": true,
 		"id":      participant.ID,
 		"source":  participant.Source,
 	})
 }
 
-func handleSession(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func handleSession(c *gin.Context) {
 	var session StudySession
-	if err := json.NewDecoder(r.Body).Decode(&session); err != nil {
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&session); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
 		return
 	}
 
 	// Create session in database
 	if err := db.Create(&session).Error; err != nil {
-		http.Error(w, "Failed to save session: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Failed to save session: " + err.Error()})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
+	c.JSON(201, gin.H{
+		"success":   true,
 		"session_id": session.SessionID,
-		"id": session.ID,
+		"id":        session.ID,
 	})
 }
 
-func handleQuizResponse(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func handleQuizResponse(c *gin.Context) {
 	var quizResponse QuizResponse
-	if err := json.NewDecoder(r.Body).Decode(&quizResponse); err != nil {
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&quizResponse); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
 		return
 	}
 
@@ -172,32 +159,20 @@ func handleQuizResponse(w http.ResponseWriter, r *http.Request) {
 
 	// Create quiz response in database
 	if err := db.Create(&quizResponse).Error; err != nil {
-		http.Error(w, "Failed to save quiz response: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Failed to save quiz response: " + err.Error()})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	c.JSON(201, gin.H{
 		"success": true,
 		"id":      quizResponse.ID,
 	})
 }
 
-func handleCalibration(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func handleCalibration(c *gin.Context) {
 	var calibration CalibrationData
-	if err := json.NewDecoder(r.Body).Decode(&calibration); err != nil {
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&calibration); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
 		return
 	}
 
@@ -208,32 +183,20 @@ func handleCalibration(w http.ResponseWriter, r *http.Request) {
 
 	// Create calibration data in database
 	if err := db.Create(&calibration).Error; err != nil {
-		http.Error(w, "Failed to save calibration data: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Failed to save calibration data: " + err.Error()})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	c.JSON(201, gin.H{
 		"success": true,
 		"id":      calibration.ID,
 	})
 }
 
-func handleGazePoint(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func handleGazePoint(c *gin.Context) {
 	var gazePoint GazePoint
-	if err := json.NewDecoder(r.Body).Decode(&gazePoint); err != nil {
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&gazePoint); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
 		return
 	}
 
@@ -244,32 +207,20 @@ func handleGazePoint(w http.ResponseWriter, r *http.Request) {
 
 	// Create gaze point in database
 	if err := db.Create(&gazePoint).Error; err != nil {
-		http.Error(w, "Failed to save gaze point: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Failed to save gaze point: " + err.Error()})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	c.JSON(201, gin.H{
 		"success": true,
 		"id":      gazePoint.ID,
 	})
 }
 
-func handleReadingEvent(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func handleReadingEvent(c *gin.Context) {
 	var readingEvent ReadingEvent
-	if err := json.NewDecoder(r.Body).Decode(&readingEvent); err != nil {
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&readingEvent); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
 		return
 	}
 
@@ -280,32 +231,20 @@ func handleReadingEvent(w http.ResponseWriter, r *http.Request) {
 
 	// Create reading event in database
 	if err := db.Create(&readingEvent).Error; err != nil {
-		http.Error(w, "Failed to save reading event: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Failed to save reading event: " + err.Error()})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	c.JSON(201, gin.H{
 		"success": true,
 		"id":      readingEvent.ID,
 	})
 }
 
-func handleAccuracy(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func handleAccuracy(c *gin.Context) {
 	var accuracy AccuracyMeasurement
-	if err := json.NewDecoder(r.Body).Decode(&accuracy); err != nil {
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&accuracy); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
 		return
 	}
 
@@ -316,85 +255,59 @@ func handleAccuracy(w http.ResponseWriter, r *http.Request) {
 
 	// Create accuracy measurement in database
 	if err := db.Create(&accuracy).Error; err != nil {
-		http.Error(w, "Failed to save accuracy measurement: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Failed to save accuracy measurement: " + err.Error()})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	c.JSON(201, gin.H{
 		"success": true,
 		"id":      accuracy.ID,
 	})
 }
 
-func handleStudyText(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func handleStudyText(c *gin.Context) {
 	// Get version from query parameter, default to "default"
-	version := r.URL.Query().Get("version")
-	if version == "" {
-		version = "default"
-	}
+	version := c.DefaultQuery("version", "default")
 
 	var studyText StudyText
 	if err := db.Where("version = ? AND active = ?", version, true).First(&studyText).Error; err != nil {
 		// If not found, try to get any active study text
 		if err := db.Where("active = ?", true).First(&studyText).Error; err != nil {
-			http.Error(w, "No study text found", http.StatusNotFound)
+			c.JSON(404, gin.H{"error": "No study text found"})
 			return
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":         studyText.ID,
-		"version":    studyText.Version,
-		"content":    studyText.Content,
-		"font_left":  studyText.FontLeft,
+	c.JSON(200, gin.H{
+		"id":        studyText.ID,
+		"version":   studyText.Version,
+		"content":   studyText.Content,
+		"font_left": studyText.FontLeft,
 		"font_right": studyText.FontRight,
 	})
 }
 
-func handleQuizQuestions(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func handleQuizQuestions(c *gin.Context) {
 	// Get study_text_id from query parameter
-	studyTextID := r.URL.Query().Get("study_text_id")
-	
+	studyTextID := c.Query("study_text_id")
+
 	var questions []QuizQuestion
 	query := db.Order("`order` ASC")
-	
+
 	if studyTextID != "" {
 		query = query.Where("study_text_id = ?", studyTextID)
 	} else {
 		// If no study_text_id provided, get questions for active study text
 		var studyText StudyText
 		if err := db.Where("active = ?", true).First(&studyText).Error; err != nil {
-			http.Error(w, "No active study text found", http.StatusNotFound)
+			c.JSON(404, gin.H{"error": "No active study text found"})
 			return
 		}
 		query = query.Where("study_text_id = ?", studyText.ID)
 	}
 
 	if err := query.Find(&questions).Error; err != nil {
-		http.Error(w, "Failed to fetch quiz questions: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Failed to fetch quiz questions: " + err.Error()})
 		return
 	}
 
@@ -422,26 +335,18 @@ func handleQuizQuestions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	c.JSON(200, response)
 }
 
 // Admin endpoints for managing study text and quiz questions
 
-func handleAdminStudyText(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	switch r.Method {
+func handleAdminStudyText(c *gin.Context) {
+	switch c.Request.Method {
 	case "POST":
 		// Create new study text
 		var studyText StudyText
-		if err := json.NewDecoder(r.Body).Decode(&studyText); err != nil {
-			http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		if err := c.ShouldBindJSON(&studyText); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
 			return
 		}
 
@@ -456,18 +361,36 @@ func handleAdminStudyText(w http.ResponseWriter, r *http.Request) {
 			studyText.FontRight = "sans"
 		}
 
+		// Check if version already exists (idempotent behavior)
+		var existingStudyText StudyText
+		if err := db.Where("version = ?", studyText.Version).First(&existingStudyText).Error; err == nil {
+			// Version exists, return existing study text
+			c.JSON(200, gin.H{
+				"success": true,
+				"id":      existingStudyText.ID,
+				"message": "Study text with this version already exists",
+			})
+			return
+		}
+
 		// If this is set to active, deactivate all others
 		if studyText.Active {
 			db.Model(&StudyText{}).Where("active = ?", true).Update("active", false)
 		}
 
 		if err := db.Create(&studyText).Error; err != nil {
-			http.Error(w, "Failed to create study text: "+err.Error(), http.StatusInternalServerError)
+			// Check for unique constraint violation (fallback check)
+			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				c.JSON(409, gin.H{
+					"error": fmt.Sprintf("Study text with version '%s' already exists", studyText.Version),
+				})
+				return
+			}
+			c.JSON(500, gin.H{"error": "Failed to create study text: " + err.Error()})
 			return
 		}
 
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		c.JSON(201, gin.H{
 			"success": true,
 			"id":      studyText.ID,
 			"message": "Study text created successfully",
@@ -484,19 +407,19 @@ func handleAdminStudyText(w http.ResponseWriter, r *http.Request) {
 			Active    *bool  `json:"active,omitempty"`
 		}
 
-		if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
-			http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		if err := c.ShouldBindJSON(&updateData); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
 			return
 		}
 
 		if updateData.ID == 0 {
-			http.Error(w, "ID is required", http.StatusBadRequest)
+			c.JSON(400, gin.H{"error": "ID is required"})
 			return
 		}
 
 		var studyText StudyText
 		if err := db.First(&studyText, updateData.ID).Error; err != nil {
-			http.Error(w, "Study text not found", http.StatusNotFound)
+			c.JSON(404, gin.H{"error": "Study text not found"})
 			return
 		}
 
@@ -522,11 +445,11 @@ func handleAdminStudyText(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := db.Save(&studyText).Error; err != nil {
-			http.Error(w, "Failed to update study text: "+err.Error(), http.StatusInternalServerError)
+			c.JSON(500, gin.H{"error": "Failed to update study text: " + err.Error()})
 			return
 		}
 
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		c.JSON(200, gin.H{
 			"success": true,
 			"id":      studyText.ID,
 			"message": "Study text updated successfully",
@@ -536,29 +459,22 @@ func handleAdminStudyText(w http.ResponseWriter, r *http.Request) {
 		// List all study texts
 		var studyTexts []StudyText
 		if err := db.Order("created_at DESC").Find(&studyTexts).Error; err != nil {
-			http.Error(w, "Failed to fetch study texts: "+err.Error(), http.StatusInternalServerError)
+			c.JSON(500, gin.H{"error": "Failed to fetch study texts: " + err.Error()})
 			return
 		}
 
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		c.JSON(200, gin.H{
 			"success": true,
 			"data":    studyTexts,
 		})
 
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		c.JSON(405, gin.H{"error": "Method not allowed"})
 	}
 }
 
-func handleAdminQuizQuestion(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	switch r.Method {
+func handleAdminQuizQuestion(c *gin.Context) {
+	switch c.Request.Method {
 	case "POST":
 		// Create new quiz question
 		var questionData struct {
@@ -570,40 +486,39 @@ func handleAdminQuizQuestion(w http.ResponseWriter, r *http.Request) {
 			Order       int      `json:"order"`
 		}
 
-		if err := json.NewDecoder(r.Body).Decode(&questionData); err != nil {
-			http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		if err := c.ShouldBindJSON(&questionData); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
 			return
 		}
 
 		// Validate required fields
 		if questionData.StudyTextID == 0 || questionData.QuestionID == "" || questionData.Prompt == "" {
-			http.Error(w, "study_text_id, question_id, and prompt are required", http.StatusBadRequest)
+			c.JSON(400, gin.H{"error": "study_text_id, question_id, and prompt are required"})
 			return
 		}
 
 		// Convert choices to JSON string
 		choicesJSON, err := json.Marshal(questionData.Choices)
 		if err != nil {
-			http.Error(w, "Invalid choices format: "+err.Error(), http.StatusBadRequest)
+			c.JSON(400, gin.H{"error": "Invalid choices format: " + err.Error()})
 			return
 		}
 
 		question := QuizQuestion{
 			StudyTextID: questionData.StudyTextID,
 			QuestionID:  questionData.QuestionID,
-			Prompt:     questionData.Prompt,
-			Choices:    string(choicesJSON),
-			Answer:     questionData.Answer,
-			Order:      questionData.Order,
+			Prompt:      questionData.Prompt,
+			Choices:     string(choicesJSON),
+			Answer:      questionData.Answer,
+			Order:       questionData.Order,
 		}
 
 		if err := db.Create(&question).Error; err != nil {
-			http.Error(w, "Failed to create quiz question: "+err.Error(), http.StatusInternalServerError)
+			c.JSON(500, gin.H{"error": "Failed to create quiz question: " + err.Error()})
 			return
 		}
 
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		c.JSON(201, gin.H{
 			"success": true,
 			"id":      question.ID,
 			"message": "Quiz question created successfully",
@@ -620,19 +535,19 @@ func handleAdminQuizQuestion(w http.ResponseWriter, r *http.Request) {
 			Order      *int      `json:"order,omitempty"`
 		}
 
-		if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
-			http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		if err := c.ShouldBindJSON(&updateData); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
 			return
 		}
 
 		if updateData.ID == 0 {
-			http.Error(w, "ID is required", http.StatusBadRequest)
+			c.JSON(400, gin.H{"error": "ID is required"})
 			return
 		}
 
 		var question QuizQuestion
 		if err := db.First(&question, updateData.ID).Error; err != nil {
-			http.Error(w, "Quiz question not found", http.StatusNotFound)
+			c.JSON(404, gin.H{"error": "Quiz question not found"})
 			return
 		}
 
@@ -646,7 +561,7 @@ func handleAdminQuizQuestion(w http.ResponseWriter, r *http.Request) {
 		if updateData.Choices != nil {
 			choicesJSON, err := json.Marshal(updateData.Choices)
 			if err != nil {
-				http.Error(w, "Invalid choices format: "+err.Error(), http.StatusBadRequest)
+				c.JSON(400, gin.H{"error": "Invalid choices format: " + err.Error()})
 				return
 			}
 			question.Choices = string(choicesJSON)
@@ -659,11 +574,11 @@ func handleAdminQuizQuestion(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := db.Save(&question).Error; err != nil {
-			http.Error(w, "Failed to update quiz question: "+err.Error(), http.StatusInternalServerError)
+			c.JSON(500, gin.H{"error": "Failed to update quiz question: " + err.Error()})
 			return
 		}
 
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		c.JSON(200, gin.H{
 			"success": true,
 			"id":      question.ID,
 			"message": "Quiz question updated successfully",
@@ -671,33 +586,33 @@ func handleAdminQuizQuestion(w http.ResponseWriter, r *http.Request) {
 
 	case "DELETE":
 		// Delete quiz question
-		id := r.URL.Query().Get("id")
+		id := c.Query("id")
 		if id == "" {
-			http.Error(w, "ID parameter is required", http.StatusBadRequest)
+			c.JSON(400, gin.H{"error": "ID parameter is required"})
 			return
 		}
 
 		if err := db.Delete(&QuizQuestion{}, id).Error; err != nil {
-			http.Error(w, "Failed to delete quiz question: "+err.Error(), http.StatusInternalServerError)
+			c.JSON(500, gin.H{"error": "Failed to delete quiz question: " + err.Error()})
 			return
 		}
 
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		c.JSON(200, gin.H{
 			"success": true,
 			"message": "Quiz question deleted successfully",
 		})
 
 	case "GET":
 		// Get single quiz question by ID
-		id := r.URL.Query().Get("id")
+		id := c.Query("id")
 		if id == "" {
-			http.Error(w, "ID parameter is required", http.StatusBadRequest)
+			c.JSON(400, gin.H{"error": "ID parameter is required"})
 			return
 		}
 
 		var question QuizQuestion
 		if err := db.First(&question, id).Error; err != nil {
-			http.Error(w, "Quiz question not found", http.StatusNotFound)
+			c.JSON(404, gin.H{"error": "Quiz question not found"})
 			return
 		}
 
@@ -705,9 +620,9 @@ func handleAdminQuizQuestion(w http.ResponseWriter, r *http.Request) {
 		var choices []string
 		json.Unmarshal([]byte(question.Choices), &choices)
 
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		c.JSON(200, gin.H{
 			"success": true,
-			"data": map[string]interface{}{
+			"data": gin.H{
 				"id":           question.ID,
 				"study_text_id": question.StudyTextID,
 				"question_id":  question.QuestionID,
@@ -719,7 +634,7 @@ func handleAdminQuizQuestion(w http.ResponseWriter, r *http.Request) {
 		})
 
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		c.JSON(405, gin.H{"error": "Method not allowed"})
 	}
 }
 
