@@ -384,8 +384,8 @@
           {/if} -->
         </div>
         
-        <div class="w-full flex items-center justify-center gap-150">
-        <div class="flex-1 max-w-xl flex flex-col items-center gap-8">
+        <div class="w-full flex items-center justify-center gap-100">
+        <div class="flex-1 max-w-2xl flex flex-col items-center gap-8">
           <ReadingPanel
             class="bg-white rounded-xl p-4 shadow-sm border-1 border-gray-200 w-full"
             label="Box A"
@@ -402,7 +402,9 @@
           </button>
         </div>
 
-        <div class="flex-1 max-w-xl flex flex-col items-center gap-8">
+        <!-- <div class="w-70"></div> -->
+
+        <div class="flex-1 max-w-2xl flex flex-col items-center gap-8">
           <ReadingPanel
             class="bg-white rounded-xl p-4 shadow-sm border-1 border-gray-200"
             label="Box B"
