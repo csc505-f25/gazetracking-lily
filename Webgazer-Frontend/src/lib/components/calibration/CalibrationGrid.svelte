@@ -59,7 +59,7 @@
   {#each CAL_POINTS as [px, py], i}
     <button
       type="button"
-      class="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-gray-900 bg-white grid place-items-center transition-all disabled:cursor-not-allowed disabled:opacity-50 hover:scale-110 active:scale-95 shadow-sm"
+      class="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-gray-900 bg-white grid place-items-center transition-all disabled:cursor-not-allowed disabled:opacity-50 hover:scale-110 active:scale-95 shadow-sm z-50"
       style={`
         left:${px}%; 
         top:${py}%; 
@@ -68,6 +68,7 @@
         opacity:${0.2 * counts[i] + 0.2}; 
         background-color:${counts[i] >= clicksPerPoint ? 'yellow' : 'white'};
         font-size:${Math.max(10, dotSize * 0.35)}px;
+        z-index: 9999;
       `}
       title={`Clicks: ${counts[i]} / ${clicksPerPoint}`}
       on:click|stopPropagation={(e) => onPointClick(i, e)}

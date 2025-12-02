@@ -1,3 +1,11 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+
+/* Ensure WebGazer video overlay doesn't cover calibration dots */
+#webgazer_videoElement,
+.webgazer_videoElement,
+video[id*='webgazer'],
+video[class*='webgazer'] {
+	z-index: 1 !important;
+}
