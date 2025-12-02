@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { fetchQuizQuestions, type QuizQuestionResponse } from '$lib/api';
   import { QuizQuestion } from '$lib/components/quiz';
   import { submitCompleteSession } from '$lib/api';
@@ -68,7 +69,22 @@
     try {
       const success = await submitCompleteSession(answers);
       if (success) {
-        submitted = true;
+        // Check if there are more passages to read
+        const currentPassageIndex = parseInt(sessionStorage.getItem('current_passage_index') || '0', 10);
+        const totalPassages = parseInt(sessionStorage.getItem('total_passages') || '1', 10);
+        
+        if (currentPassageIndex < totalPassages - 1) {
+          // Move to next passage
+          const nextPassageIndex = currentPassageIndex + 1;
+          sessionStorage.setItem('current_passage_index', String(nextPassageIndex));
+          sessionStorage.setItem('current_screen', '1'); // Reset screen counter
+          
+          // Navigate back to read page for next passage
+          goto('/read');
+        } else {
+          // All passages completed
+          submitted = true;
+        }
       } else {
         submitError = 'Failed to submit responses. Please try again.';
         submitting = false;
