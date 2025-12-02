@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
   import { get } from 'svelte/store';
   import { fetchStudyText, submitGazePoint, type Passage } from '$lib/api';
-  import { WebGazerManager } from '$lib/components';
+  import { WebGazerManager, Modal } from '$lib/components';
   import { ReadingPanel } from '$lib/components/reading';
   import { webgazerStore } from '$lib/stores/webgazer';
 
@@ -16,6 +16,7 @@
   let timeB = 0;
   let fontPreference: 'A' | 'B' | null = null;
   let loading = true;
+  let showInstructionModal = false;
   
   // Passage management
   let passages: Passage[] = [];
@@ -151,10 +152,15 @@
       fonts = { ...defaultFonts };
     }
 
-    // Auto-start reading when passage loads (this enables gaze collection)
-    setTimeout(() => {
-      start();
-    }, 100);
+    // Show instruction modal only for the first passage (index 0)
+    if (index === 0) {
+      showInstructionModal = true;
+    } else {
+      // For subsequent passages, start reading directly
+      setTimeout(() => {
+        start();
+      }, 100);
+    }
   }
 
   function handleWebGazerInitialized(instance: any) {
@@ -285,6 +291,14 @@
     t0 = performance.now();
   }
 
+  function handleInstructionModalClose() {
+    showInstructionModal = false;
+    // Start reading after modal is closed
+    setTimeout(() => {
+      start();
+    }, 100);
+  }
+
   function completeA() {
     if (!started || doneA) return;
     timeA = performance.now() - t0;
@@ -367,6 +381,15 @@
   showFaceFeedbackBox={false}
   showPredictionPoints={false}
   onInitialized={handleWebGazerInitialized}
+/>
+
+<!-- Instruction Modal -->
+<Modal
+  open={showInstructionModal}
+  title="Reading Instructions"
+  message="Please read the passage carefully. You will be asked comprehension questions about the content after you finish reading. Take your time to understand the material."
+  buttonText="Start Reading"
+  onClose={handleInstructionModalClose}
 />
 
 <div class="min-h-screen bg-gray-100 flex flex-col">
