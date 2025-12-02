@@ -28,14 +28,18 @@
       wgInstance = storeState.instance;
       webGazerReady = true;
       console.log('Using existing WebGazer instance from store');
-      // Start measurement after components are ready
-      setTimeout(() => {
-        startMeasurementIfReady();
-      }, 1500);
+      // Don't start measurement here - wait for modal to close
+      // Measurement will start when closeInstructionModal is called
     }
   });
 
   function startMeasurementIfReady() {
+    // Don't start if instruction modal is still open
+    if (showInstructionModal) {
+      console.log('Waiting for user to close instruction modal...');
+      return;
+    }
+    
     if (accuracyMeasurer && webGazerReady) {
       console.log('Starting accuracy measurement...');
       accuracyMeasurer.startMeasurement().catch((error) => {
@@ -52,9 +56,8 @@
     webGazerReady = true;
     console.log('WebGazer initialized on accuracy page', instance);
     
-    setTimeout(() => {
-      startMeasurementIfReady();
-    }, 1000);
+    // Don't start measurement here - wait for modal to close
+    // Measurement will start when closeInstructionModal is called
   }
 
   function handleWebGazerError(error: string) {
@@ -80,13 +83,7 @@
       }
     }
 
-    // Automatically navigate to reading page after a short delay if accuracy meets threshold
-    // Show result for 2 seconds, then navigate
-    if (acc >= ACCURACY_THRESHOLD) {
-      setTimeout(() => {
-        goto('/read');
-      }, 2000);
-    }
+    // Don't navigate automatically - wait for user to click OK on result modal
   }
 
   function handleAccuracyError(error: string) {
@@ -120,10 +117,18 @@
 
   function closeInstructionModal() {
     showInstructionModal = false;
+    // Start measurement after modal is closed
+    setTimeout(() => {
+      startMeasurementIfReady();
+    }, 300);
   }
 
   function closeResultModal() {
     showResultModal = false;
+    // Navigate to reading page if accuracy meets threshold
+    if (accuracy >= ACCURACY_THRESHOLD) {
+      goto('/read');
+    }
   }
 
   function handleRecalibrate() {
@@ -177,7 +182,7 @@
 
   <!-- Accuracy measurer - full width and height -->
   <div class="flex-1 w-full px-4 pb-2 min-h-0">
-    <div class="relative w-full h-full border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 overflow-hidden">
+    <div class="relative w-full h-full rounded-xl overflow-hidden">
       <AccuracyMeasurer
         bind:this={accuracyMeasurer}
         bind:measuring
@@ -188,53 +193,11 @@
     </div>
   </div>
 
-  <!-- Controls section - centered with max width -->
-  <div class="flex-shrink-0 w-full flex justify-center px-4 py-3">
-    <div class="w-full max-w-3xl space-y-2 text-center">
-      {#if finished}
-        <p class="text-gray-800 text-sm">
-          Accuracy: <span class="font-medium">{accuracy}%</span>
-          {#if accuracy < ACCURACY_THRESHOLD}
-            <span class="text-red-600"> (below {ACCURACY_THRESHOLD}%)</span>
-          {/if}
-        </p>
-      {/if}
-
-      <div class="flex items-center justify-center gap-3">
-        {#if finished && accuracy < ACCURACY_THRESHOLD}
-          <button
-            on:click={() => goto('/calibrate')}
-            class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm"
-          >
-            Recalibrate
-          </button>
-        {/if}
-        {#if finished}
-          <button
-            on:click={handleRetry}
-            class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm"
-          >
-            Retry Measurement
-          </button>
-        {/if}
-        <button
-          on:click={finish}
-          disabled={!canContinue}
-          class="px-6 py-2 rounded-lg text-white shadow-sm transition-colors text-sm
-                 disabled:opacity-50 disabled:cursor-not-allowed
-                 bg-gray-900 hover:bg-gray-800"
-        >
-          Continue
-        </button>
-      </div>
-
-      {#if !canContinue && finished}
-        <p class="text-xs text-gray-500">
-          You can continue once accuracy is at least {ACCURACY_THRESHOLD}%, or recalibrate to improve.
-        </p>
-      {/if}
-    </div>
-  </div>
+    {#if !canContinue && finished}
+      <p class="text-xs text-gray-500">
+        You can continue once accuracy is at least {ACCURACY_THRESHOLD}%, or recalibrate to improve.
+      </p>
+    {/if}
 </div>
 
 <GazeOverlay showTrail={showGazeTrail} trailLength={25} />

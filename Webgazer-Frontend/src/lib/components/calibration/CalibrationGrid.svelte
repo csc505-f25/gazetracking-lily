@@ -54,7 +54,7 @@
 
 <div 
   bind:this={containerElement}
-  class="relative w-full h-full border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 overflow-hidden"
+  class="relative w-full h-full overflow-hidden"
 >
   {#each CAL_POINTS as [px, py], i}
     <button
