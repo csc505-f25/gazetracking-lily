@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -43,23 +44,18 @@ func main() {
 
 	fmt.Println("Database initialized successfully")
 
-	// Setup Gin router
-	router := gin.Default()
-
-	// Configure trusted proxies (security best practice)
-	// For local development, we don't trust any proxies
-	// In production, configure this based on your infrastructure
-	router.SetTrustedProxies(nil)
+	// Setup Echo router
+	e := echo.New()
 
 	// Configure CORS middleware
-	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:5173", "http://localhost:4173", "http://localhost:3000"}
-	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
-	config.AllowHeaders = []string{"Content-Type"}
-	router.Use(cors.New(config))
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"http://localhost:5173", "http://localhost:4173", "http://localhost:3000"},
+		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions},
+		AllowHeaders: []string{"Content-Type"},
+	}))
 
 	// API routes
-	api := router.Group("/api")
+	api := e.Group("/api")
 	{
 		api.POST("/participant", handleParticipant)
 		api.POST("/session", handleSession)
@@ -98,18 +94,17 @@ func main() {
 	}
 
 	fmt.Printf("Server starting on port %s\n", port)
-	log.Fatal(router.Run(":" + port))
+	log.Fatal(e.Start(":" + port))
 }
 
-func handleHealth(c *gin.Context) {
-	c.JSON(200, gin.H{"status": "ok"})
+func handleHealth(c echo.Context) error {
+	return c.JSON(200, map[string]string{"status": "ok"})
 }
 
-func handleParticipant(c *gin.Context) {
+func handleParticipant(c echo.Context) error {
 	var participant Participant
-	if err := c.ShouldBindJSON(&participant); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
-		return
+	if err := c.Bind(&participant); err != nil {
+		return c.JSON(400, map[string]string{"error": "Invalid JSON: " + err.Error()})
 	}
 
 	// Set default source if not provided
@@ -119,42 +114,38 @@ func handleParticipant(c *gin.Context) {
 
 	// Create participant in database
 	if err := db.Create(&participant).Error; err != nil {
-		c.JSON(500, gin.H{"error": "Failed to save participant: " + err.Error()})
-		return
+		return c.JSON(500, map[string]string{"error": "Failed to save participant: " + err.Error()})
 	}
 
-	c.JSON(201, gin.H{
+	return c.JSON(201, map[string]interface{}{
 		"success": true,
 		"id":      participant.ID,
 		"source":  participant.Source,
 	})
 }
 
-func handleSession(c *gin.Context) {
+func handleSession(c echo.Context) error {
 	var session StudySession
-	if err := c.ShouldBindJSON(&session); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
-		return
+	if err := c.Bind(&session); err != nil {
+		return c.JSON(400, map[string]string{"error": "Invalid JSON: " + err.Error()})
 	}
 
 	// Create session in database
 	if err := db.Create(&session).Error; err != nil {
-		c.JSON(500, gin.H{"error": "Failed to save session: " + err.Error()})
-		return
+		return c.JSON(500, map[string]string{"error": "Failed to save session: " + err.Error()})
 	}
 
-	c.JSON(201, gin.H{
-		"success":   true,
+	return c.JSON(201, map[string]interface{}{
+		"success":    true,
 		"session_id": session.SessionID,
-		"id":        session.ID,
+		"id":         session.ID,
 	})
 }
 
-func handleQuizResponse(c *gin.Context) {
+func handleQuizResponse(c echo.Context) error {
 	var quizResponse QuizResponse
-	if err := c.ShouldBindJSON(&quizResponse); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
-		return
+	if err := c.Bind(&quizResponse); err != nil {
+		return c.JSON(400, map[string]string{"error": "Invalid JSON: " + err.Error()})
 	}
 
 	// Set timestamp if not provided
@@ -164,21 +155,19 @@ func handleQuizResponse(c *gin.Context) {
 
 	// Create quiz response in database
 	if err := db.Create(&quizResponse).Error; err != nil {
-		c.JSON(500, gin.H{"error": "Failed to save quiz response: " + err.Error()})
-		return
+		return c.JSON(500, map[string]string{"error": "Failed to save quiz response: " + err.Error()})
 	}
 
-	c.JSON(201, gin.H{
+	return c.JSON(201, map[string]interface{}{
 		"success": true,
 		"id":      quizResponse.ID,
 	})
 }
 
-func handleCalibration(c *gin.Context) {
+func handleCalibration(c echo.Context) error {
 	var calibration CalibrationData
-	if err := c.ShouldBindJSON(&calibration); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
-		return
+	if err := c.Bind(&calibration); err != nil {
+		return c.JSON(400, map[string]string{"error": "Invalid JSON: " + err.Error()})
 	}
 
 	// Set timestamp if not provided
@@ -188,21 +177,19 @@ func handleCalibration(c *gin.Context) {
 
 	// Create calibration data in database
 	if err := db.Create(&calibration).Error; err != nil {
-		c.JSON(500, gin.H{"error": "Failed to save calibration data: " + err.Error()})
-		return
+		return c.JSON(500, map[string]string{"error": "Failed to save calibration data: " + err.Error()})
 	}
 
-	c.JSON(201, gin.H{
+	return c.JSON(201, map[string]interface{}{
 		"success": true,
 		"id":      calibration.ID,
 	})
 }
 
-func handleGazePoint(c *gin.Context) {
+func handleGazePoint(c echo.Context) error {
 	var gazePoint GazePoint
-	if err := c.ShouldBindJSON(&gazePoint); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
-		return
+	if err := c.Bind(&gazePoint); err != nil {
+		return c.JSON(400, map[string]string{"error": "Invalid JSON: " + err.Error()})
 	}
 
 	// Set timestamp if not provided
@@ -212,21 +199,19 @@ func handleGazePoint(c *gin.Context) {
 
 	// Create gaze point in database
 	if err := db.Create(&gazePoint).Error; err != nil {
-		c.JSON(500, gin.H{"error": "Failed to save gaze point: " + err.Error()})
-		return
+		return c.JSON(500, map[string]string{"error": "Failed to save gaze point: " + err.Error()})
 	}
 
-	c.JSON(201, gin.H{
+	return c.JSON(201, map[string]interface{}{
 		"success": true,
 		"id":      gazePoint.ID,
 	})
 }
 
-func handleReadingEvent(c *gin.Context) {
+func handleReadingEvent(c echo.Context) error {
 	var readingEvent ReadingEvent
-	if err := c.ShouldBindJSON(&readingEvent); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
-		return
+	if err := c.Bind(&readingEvent); err != nil {
+		return c.JSON(400, map[string]string{"error": "Invalid JSON: " + err.Error()})
 	}
 
 	// Set timestamp if not provided
@@ -236,21 +221,19 @@ func handleReadingEvent(c *gin.Context) {
 
 	// Create reading event in database
 	if err := db.Create(&readingEvent).Error; err != nil {
-		c.JSON(500, gin.H{"error": "Failed to save reading event: " + err.Error()})
-		return
+		return c.JSON(500, map[string]string{"error": "Failed to save reading event: " + err.Error()})
 	}
 
-	c.JSON(201, gin.H{
+	return c.JSON(201, map[string]interface{}{
 		"success": true,
 		"id":      readingEvent.ID,
 	})
 }
 
-func handleAccuracy(c *gin.Context) {
+func handleAccuracy(c echo.Context) error {
 	var accuracy AccuracyMeasurement
-	if err := c.ShouldBindJSON(&accuracy); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
-		return
+	if err := c.Bind(&accuracy); err != nil {
+		return c.JSON(400, map[string]string{"error": "Invalid JSON: " + err.Error()})
 	}
 
 	// Set timestamp if not provided
@@ -260,31 +243,32 @@ func handleAccuracy(c *gin.Context) {
 
 	// Create accuracy measurement in database
 	if err := db.Create(&accuracy).Error; err != nil {
-		c.JSON(500, gin.H{"error": "Failed to save accuracy measurement: " + err.Error()})
-		return
+		return c.JSON(500, map[string]string{"error": "Failed to save accuracy measurement: " + err.Error()})
 	}
 
-	c.JSON(201, gin.H{
+	return c.JSON(201, map[string]interface{}{
 		"success": true,
 		"id":      accuracy.ID,
 	})
 }
 
-func handleStudyText(c *gin.Context) {
+func handleStudyText(c echo.Context) error {
 	// Get version from query parameter, default to "default"
-	version := c.DefaultQuery("version", "default")
+	version := c.QueryParam("version")
+	if version == "" {
+		version = "default"
+	}
 
 	var studyText StudyText
 	if err := db.Preload("Passages").Where("version = ? AND active = ?", version, true).First(&studyText).Error; err != nil {
 		// If not found, try to get any active study text
 		if err := db.Preload("Passages").Where("active = ?", true).First(&studyText).Error; err != nil {
-			c.JSON(404, gin.H{"error": "No study text found"})
-			return
+			return c.JSON(404, map[string]string{"error": "No study text found"})
 		}
 	}
 
 	// Build response - include passages if they exist, otherwise use legacy content
-	response := gin.H{
+	response := map[string]interface{}{
 		"id":        studyText.ID,
 		"version":   studyText.Version,
 		"font_left": studyText.FontLeft,
@@ -298,12 +282,12 @@ func handleStudyText(c *gin.Context) {
 		response["content"] = studyText.Content
 	}
 
-	c.JSON(200, response)
+	return c.JSON(200, response)
 }
 
-func handleQuizQuestions(c *gin.Context) {
+func handleQuizQuestions(c echo.Context) error {
 	// Get study_text_id from query parameter
-	studyTextID := c.Query("study_text_id")
+	studyTextID := c.QueryParam("study_text_id")
 
 	var questions []QuizQuestion
 	query := db.Order("`order` ASC")
@@ -314,15 +298,13 @@ func handleQuizQuestions(c *gin.Context) {
 		// If no study_text_id provided, get questions for active study text
 		var studyText StudyText
 		if err := db.Where("active = ?", true).First(&studyText).Error; err != nil {
-			c.JSON(404, gin.H{"error": "No active study text found"})
-			return
+			return c.JSON(404, map[string]string{"error": "No active study text found"})
 		}
 		query = query.Where("study_text_id = ?", studyText.ID)
 	}
 
 	if err := query.Find(&questions).Error; err != nil {
-		c.JSON(500, gin.H{"error": "Failed to fetch quiz questions: " + err.Error()})
-		return
+		return c.JSON(500, map[string]string{"error": "Failed to fetch quiz questions: " + err.Error()})
 	}
 
 	// Format response to match frontend expectations
@@ -349,32 +331,29 @@ func handleQuizQuestions(c *gin.Context) {
 		}
 	}
 
-	c.JSON(200, response)
+	return c.JSON(200, response)
 }
 
 // Admin endpoints for managing study text, passages, and quiz questions
 
-func handleAdminPassage(c *gin.Context) {
-	switch c.Request.Method {
+func handleAdminPassage(c echo.Context) error {
+	switch c.Request().Method {
 	case "POST":
 		// Create new passage
 		var passage Passage
-		if err := c.ShouldBindJSON(&passage); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
-			return
+		if err := c.Bind(&passage); err != nil {
+			return c.JSON(400, map[string]string{"error": "Invalid JSON: " + err.Error()})
 		}
 
 		// Validate required fields
 		if passage.StudyTextID == 0 || passage.Content == "" {
-			c.JSON(400, gin.H{"error": "study_text_id and content are required"})
-			return
+			return c.JSON(400, map[string]string{"error": "study_text_id and content are required"})
 		}
 
 		// Verify study text exists
 		var studyText StudyText
 		if err := db.First(&studyText, passage.StudyTextID).Error; err != nil {
-			c.JSON(404, gin.H{"error": "Study text not found"})
-			return
+			return c.JSON(404, map[string]string{"error": "Study text not found"})
 		}
 
 		// If order not specified, set it to the next available order
@@ -385,11 +364,10 @@ func handleAdminPassage(c *gin.Context) {
 		}
 
 		if err := db.Create(&passage).Error; err != nil {
-			c.JSON(500, gin.H{"error": "Failed to create passage: " + err.Error()})
-			return
+			return c.JSON(500, map[string]string{"error": "Failed to create passage: " + err.Error()})
 		}
 
-		c.JSON(201, gin.H{
+		return c.JSON(201, map[string]interface{}{
 			"success": true,
 			"id":      passage.ID,
 			"message": "Passage created successfully",
@@ -406,20 +384,17 @@ func handleAdminPassage(c *gin.Context) {
 			FontRight string `json:"font_right,omitempty"`
 		}
 
-		if err := c.ShouldBindJSON(&updateData); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
-			return
+		if err := c.Bind(&updateData); err != nil {
+			return c.JSON(400, map[string]string{"error": "Invalid JSON: " + err.Error()})
 		}
 
 		if updateData.ID == 0 {
-			c.JSON(400, gin.H{"error": "ID is required"})
-			return
+			return c.JSON(400, map[string]string{"error": "ID is required"})
 		}
 
 		var passage Passage
 		if err := db.First(&passage, updateData.ID).Error; err != nil {
-			c.JSON(404, gin.H{"error": "Passage not found"})
-			return
+			return c.JSON(404, map[string]string{"error": "Passage not found"})
 		}
 
 		// Update fields
@@ -440,11 +415,10 @@ func handleAdminPassage(c *gin.Context) {
 		}
 
 		if err := db.Save(&passage).Error; err != nil {
-			c.JSON(500, gin.H{"error": "Failed to update passage: " + err.Error()})
-			return
+			return c.JSON(500, map[string]string{"error": "Failed to update passage: " + err.Error()})
 		}
 
-		c.JSON(200, gin.H{
+		return c.JSON(200, map[string]interface{}{
 			"success": true,
 			"id":      passage.ID,
 			"message": "Passage updated successfully",
@@ -452,36 +426,33 @@ func handleAdminPassage(c *gin.Context) {
 
 	case "DELETE":
 		// Delete passage
-		id := c.Query("id")
+		id := c.QueryParam("id")
 		if id == "" {
-			c.JSON(400, gin.H{"error": "ID parameter is required"})
-			return
+			return c.JSON(400, map[string]string{"error": "ID parameter is required"})
 		}
 
 		if err := db.Delete(&Passage{}, id).Error; err != nil {
-			c.JSON(500, gin.H{"error": "Failed to delete passage: " + err.Error()})
-			return
+			return c.JSON(500, map[string]string{"error": "Failed to delete passage: " + err.Error()})
 		}
 
-		c.JSON(200, gin.H{
+		return c.JSON(200, map[string]interface{}{
 			"success": true,
 			"message": "Passage deleted successfully",
 		})
 
 	case "GET":
 		// Get passages - either by study_text_id or by id
-		studyTextID := c.Query("study_text_id")
-		id := c.Query("id")
+		studyTextID := c.QueryParam("study_text_id")
+		id := c.QueryParam("id")
 
 		if id != "" {
 			// Get single passage by ID
 			var passage Passage
 			if err := db.First(&passage, id).Error; err != nil {
-				c.JSON(404, gin.H{"error": "Passage not found"})
-				return
+				return c.JSON(404, map[string]string{"error": "Passage not found"})
 			}
 
-			c.JSON(200, gin.H{
+			return c.JSON(200, map[string]interface{}{
 				"success": true,
 				"data":    passage,
 			})
@@ -489,31 +460,29 @@ func handleAdminPassage(c *gin.Context) {
 			// Get all passages for a study text
 			var passages []Passage
 			if err := db.Where("study_text_id = ?", studyTextID).Order("`order` ASC").Find(&passages).Error; err != nil {
-				c.JSON(500, gin.H{"error": "Failed to fetch passages: " + err.Error()})
-				return
+				return c.JSON(500, map[string]string{"error": "Failed to fetch passages: " + err.Error()})
 			}
 
-			c.JSON(200, gin.H{
+			return c.JSON(200, map[string]interface{}{
 				"success": true,
 				"data":    passages,
 			})
 		} else {
-			c.JSON(400, gin.H{"error": "Either id or study_text_id parameter is required"})
+			return c.JSON(400, map[string]string{"error": "Either id or study_text_id parameter is required"})
 		}
 
 	default:
-		c.JSON(405, gin.H{"error": "Method not allowed"})
+		return c.JSON(405, map[string]string{"error": "Method not allowed"})
 	}
 }
 
-func handleAdminStudyText(c *gin.Context) {
-	switch c.Request.Method {
+func handleAdminStudyText(c echo.Context) error {
+	switch c.Request().Method {
 	case "POST":
 		// Create new study text
 		var studyText StudyText
-		if err := c.ShouldBindJSON(&studyText); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
-			return
+		if err := c.Bind(&studyText); err != nil {
+			return c.JSON(400, map[string]string{"error": "Invalid JSON: " + err.Error()})
 		}
 
 		// Set defaults
@@ -531,12 +500,11 @@ func handleAdminStudyText(c *gin.Context) {
 		var existingStudyText StudyText
 		if err := db.Where("version = ?", studyText.Version).First(&existingStudyText).Error; err == nil {
 			// Version exists, return existing study text
-			c.JSON(200, gin.H{
+			return c.JSON(200, map[string]interface{}{
 				"success": true,
 				"id":      existingStudyText.ID,
 				"message": "Study text with this version already exists",
 			})
-			return
 		}
 
 		// If this is set to active, deactivate all others
@@ -547,16 +515,14 @@ func handleAdminStudyText(c *gin.Context) {
 		if err := db.Create(&studyText).Error; err != nil {
 			// Check for unique constraint violation (fallback check)
 			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
-				c.JSON(409, gin.H{
+				return c.JSON(409, map[string]string{
 					"error": fmt.Sprintf("Study text with version '%s' already exists", studyText.Version),
 				})
-				return
 			}
-			c.JSON(500, gin.H{"error": "Failed to create study text: " + err.Error()})
-			return
+			return c.JSON(500, map[string]string{"error": "Failed to create study text: " + err.Error()})
 		}
 
-		c.JSON(201, gin.H{
+		return c.JSON(201, map[string]interface{}{
 			"success": true,
 			"id":      studyText.ID,
 			"message": "Study text created successfully",
@@ -573,20 +539,17 @@ func handleAdminStudyText(c *gin.Context) {
 			Active    *bool  `json:"active,omitempty"`
 		}
 
-		if err := c.ShouldBindJSON(&updateData); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
-			return
+		if err := c.Bind(&updateData); err != nil {
+			return c.JSON(400, map[string]string{"error": "Invalid JSON: " + err.Error()})
 		}
 
 		if updateData.ID == 0 {
-			c.JSON(400, gin.H{"error": "ID is required"})
-			return
+			return c.JSON(400, map[string]string{"error": "ID is required"})
 		}
 
 		var studyText StudyText
 		if err := db.First(&studyText, updateData.ID).Error; err != nil {
-			c.JSON(404, gin.H{"error": "Study text not found"})
-			return
+			return c.JSON(404, map[string]string{"error": "Study text not found"})
 		}
 
 		// Update fields
@@ -611,11 +574,10 @@ func handleAdminStudyText(c *gin.Context) {
 		}
 
 		if err := db.Save(&studyText).Error; err != nil {
-			c.JSON(500, gin.H{"error": "Failed to update study text: " + err.Error()})
-			return
+			return c.JSON(500, map[string]string{"error": "Failed to update study text: " + err.Error()})
 		}
 
-		c.JSON(200, gin.H{
+		return c.JSON(200, map[string]interface{}{
 			"success": true,
 			"id":      studyText.ID,
 			"message": "Study text updated successfully",
@@ -625,22 +587,21 @@ func handleAdminStudyText(c *gin.Context) {
 		// List all study texts
 		var studyTexts []StudyText
 		if err := db.Order("created_at DESC").Find(&studyTexts).Error; err != nil {
-			c.JSON(500, gin.H{"error": "Failed to fetch study texts: " + err.Error()})
-			return
+			return c.JSON(500, map[string]string{"error": "Failed to fetch study texts: " + err.Error()})
 		}
 
-		c.JSON(200, gin.H{
+		return c.JSON(200, map[string]interface{}{
 			"success": true,
 			"data":    studyTexts,
 		})
 
 	default:
-		c.JSON(405, gin.H{"error": "Method not allowed"})
+		return c.JSON(405, map[string]string{"error": "Method not allowed"})
 	}
 }
 
-func handleAdminQuizQuestion(c *gin.Context) {
-	switch c.Request.Method {
+func handleAdminQuizQuestion(c echo.Context) error {
+	switch c.Request().Method {
 	case "POST":
 		// Create new quiz question
 		var questionData struct {
@@ -652,22 +613,19 @@ func handleAdminQuizQuestion(c *gin.Context) {
 			Order       int      `json:"order"`
 		}
 
-		if err := c.ShouldBindJSON(&questionData); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
-			return
+		if err := c.Bind(&questionData); err != nil {
+			return c.JSON(400, map[string]string{"error": "Invalid JSON: " + err.Error()})
 		}
 
 		// Validate required fields
 		if questionData.StudyTextID == 0 || questionData.QuestionID == "" || questionData.Prompt == "" {
-			c.JSON(400, gin.H{"error": "study_text_id, question_id, and prompt are required"})
-			return
+			return c.JSON(400, map[string]string{"error": "study_text_id, question_id, and prompt are required"})
 		}
 
 		// Convert choices to JSON string
 		choicesJSON, err := json.Marshal(questionData.Choices)
 		if err != nil {
-			c.JSON(400, gin.H{"error": "Invalid choices format: " + err.Error()})
-			return
+			return c.JSON(400, map[string]string{"error": "Invalid choices format: " + err.Error()})
 		}
 
 		question := QuizQuestion{
@@ -680,11 +638,10 @@ func handleAdminQuizQuestion(c *gin.Context) {
 		}
 
 		if err := db.Create(&question).Error; err != nil {
-			c.JSON(500, gin.H{"error": "Failed to create quiz question: " + err.Error()})
-			return
+			return c.JSON(500, map[string]string{"error": "Failed to create quiz question: " + err.Error()})
 		}
 
-		c.JSON(201, gin.H{
+		return c.JSON(201, map[string]interface{}{
 			"success": true,
 			"id":      question.ID,
 			"message": "Quiz question created successfully",
@@ -701,20 +658,17 @@ func handleAdminQuizQuestion(c *gin.Context) {
 			Order      *int      `json:"order,omitempty"`
 		}
 
-		if err := c.ShouldBindJSON(&updateData); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid JSON: " + err.Error()})
-			return
+		if err := c.Bind(&updateData); err != nil {
+			return c.JSON(400, map[string]string{"error": "Invalid JSON: " + err.Error()})
 		}
 
 		if updateData.ID == 0 {
-			c.JSON(400, gin.H{"error": "ID is required"})
-			return
+			return c.JSON(400, map[string]string{"error": "ID is required"})
 		}
 
 		var question QuizQuestion
 		if err := db.First(&question, updateData.ID).Error; err != nil {
-			c.JSON(404, gin.H{"error": "Quiz question not found"})
-			return
+			return c.JSON(404, map[string]string{"error": "Quiz question not found"})
 		}
 
 		// Update fields
@@ -727,8 +681,7 @@ func handleAdminQuizQuestion(c *gin.Context) {
 		if updateData.Choices != nil {
 			choicesJSON, err := json.Marshal(updateData.Choices)
 			if err != nil {
-				c.JSON(400, gin.H{"error": "Invalid choices format: " + err.Error()})
-				return
+				return c.JSON(400, map[string]string{"error": "Invalid choices format: " + err.Error()})
 			}
 			question.Choices = string(choicesJSON)
 		}
@@ -740,11 +693,10 @@ func handleAdminQuizQuestion(c *gin.Context) {
 		}
 
 		if err := db.Save(&question).Error; err != nil {
-			c.JSON(500, gin.H{"error": "Failed to update quiz question: " + err.Error()})
-			return
+			return c.JSON(500, map[string]string{"error": "Failed to update quiz question: " + err.Error()})
 		}
 
-		c.JSON(200, gin.H{
+		return c.JSON(200, map[string]interface{}{
 			"success": true,
 			"id":      question.ID,
 			"message": "Quiz question updated successfully",
@@ -752,43 +704,39 @@ func handleAdminQuizQuestion(c *gin.Context) {
 
 	case "DELETE":
 		// Delete quiz question
-		id := c.Query("id")
+		id := c.QueryParam("id")
 		if id == "" {
-			c.JSON(400, gin.H{"error": "ID parameter is required"})
-			return
+			return c.JSON(400, map[string]string{"error": "ID parameter is required"})
 		}
 
 		if err := db.Delete(&QuizQuestion{}, id).Error; err != nil {
-			c.JSON(500, gin.H{"error": "Failed to delete quiz question: " + err.Error()})
-			return
+			return c.JSON(500, map[string]string{"error": "Failed to delete quiz question: " + err.Error()})
 		}
 
-		c.JSON(200, gin.H{
+		return c.JSON(200, map[string]interface{}{
 			"success": true,
 			"message": "Quiz question deleted successfully",
 		})
 
 	case "GET":
 		// Get single quiz question by ID
-		id := c.Query("id")
+		id := c.QueryParam("id")
 		if id == "" {
-			c.JSON(400, gin.H{"error": "ID parameter is required"})
-			return
+			return c.JSON(400, map[string]string{"error": "ID parameter is required"})
 		}
 
 		var question QuizQuestion
 		if err := db.First(&question, id).Error; err != nil {
-			c.JSON(404, gin.H{"error": "Quiz question not found"})
-			return
+			return c.JSON(404, map[string]string{"error": "Quiz question not found"})
 		}
 
 		// Parse choices JSON
 		var choices []string
 		json.Unmarshal([]byte(question.Choices), &choices)
 
-		c.JSON(200, gin.H{
+		return c.JSON(200, map[string]interface{}{
 			"success": true,
-			"data": gin.H{
+			"data": map[string]interface{}{
 				"id":           question.ID,
 				"study_text_id": question.StudyTextID,
 				"question_id":  question.QuestionID,
@@ -800,7 +748,7 @@ func handleAdminQuizQuestion(c *gin.Context) {
 		})
 
 	default:
-		c.JSON(405, gin.H{"error": "Method not allowed"})
+		return c.JSON(405, map[string]string{"error": "Method not allowed"})
 	}
 }
 
