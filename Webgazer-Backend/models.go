@@ -157,14 +157,16 @@ type Passage struct {
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 	
-	// Relationship
-	StudyText StudyText `gorm:"foreignKey:StudyTextID;references:ID" json:"study_text,omitempty"`
+	// Relationships
+	StudyText     StudyText     `gorm:"foreignKey:StudyTextID;references:ID" json:"study_text,omitempty"`
+	QuizQuestions []QuizQuestion `gorm:"foreignKey:PassageID;references:ID" json:"quiz_questions,omitempty"`
 }
 
-// QuizQuestion represents a quiz question for a study text
+// QuizQuestion represents a quiz question for a study text or passage
 type QuizQuestion struct {
 	ID         uint      `gorm:"primaryKey" json:"id"`
 	StudyTextID uint     `gorm:"index;not null" json:"study_text_id"`
+	PassageID   *uint    `gorm:"index" json:"passage_id,omitempty"`  // Optional: link to specific passage (nullable for backward compatibility)
 	QuestionID string    `gorm:"not null" json:"question_id"`  // e.g., "q1", "q2"
 	Prompt     string    `gorm:"type:text;not null" json:"prompt"`
 	Choices    string    `gorm:"type:text;not null" json:"choices"` // JSON array of choices
@@ -173,7 +175,8 @@ type QuizQuestion struct {
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 	
-	// Relationship
+	// Relationships
 	StudyText StudyText `gorm:"foreignKey:StudyTextID;references:ID" json:"study_text,omitempty"`
+	Passage   *Passage  `gorm:"foreignKey:PassageID;references:ID" json:"passage,omitempty"`
 }
 

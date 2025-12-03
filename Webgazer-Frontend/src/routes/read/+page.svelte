@@ -427,12 +427,49 @@
   {:else if !currentPassage || currentPassageIndex >= passages.length}
     <!-- All Passages Complete -->
     <div class="flex-1 flex items-center justify-center">
-      <div class="text-center">
-        <h1 class="text-4xl font-bold text-gray-900 mb-4">All Passages Complete!</h1>
-        <p class="text-2xl text-gray-700 mb-2">
-          {tournament?.finalWinner ? `Font Winner: ${getFontInfo(tournament.finalWinner).displayName}` : 'Thank you for participating!'}
-        </p>
-        <p class="text-lg text-gray-500">You have finished reading all passages.</p>
+      <div class="text-center space-y-6">
+        <div class="space-y-4">
+          <h1 class="text-4xl font-bold text-gray-900 mb-4">All Passages Complete!</h1>
+          <p class="text-2xl text-gray-700 mb-2">
+            {tournament?.finalWinner ? `Font Winner: ${getFontInfo(tournament.finalWinner).displayName}` : 'Thank you for participating!'}
+          </p>
+          <p class="text-lg text-gray-500">You have finished reading all passages.</p>
+        </div>
+        <div class="pt-4">
+          <button
+            class="px-6 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors"
+            on:click={() => {
+              // Clear all study-related sessionStorage
+              sessionStorage.removeItem('current_passage_index');
+              sessionStorage.removeItem('current_passage_id');
+              sessionStorage.removeItem('current_screen');
+              sessionStorage.removeItem('total_passages');
+              sessionStorage.removeItem('study_text_id');
+              sessionStorage.removeItem('session_db_id');
+              sessionStorage.removeItem('session_id');
+              sessionStorage.removeItem('calibration_points');
+              sessionStorage.removeItem('font_left');
+              sessionStorage.removeItem('font_right');
+              sessionStorage.removeItem('time_left_ms');
+              sessionStorage.removeItem('time_right_ms');
+              sessionStorage.removeItem('timeA_ms');
+              sessionStorage.removeItem('timeB_ms');
+              sessionStorage.removeItem('font_preference');
+              sessionStorage.removeItem('font_preferred_type');
+              // Clear tournament data
+              const keys = Object.keys(sessionStorage);
+              keys.forEach(key => {
+                if (key.startsWith('match_') || key.startsWith('tournament_')) {
+                  sessionStorage.removeItem(key);
+                }
+              });
+              // Navigate to home to start over
+              goto('/');
+            }}
+          >
+            Start Over
+          </button>
+        </div>
       </div>
     </div>
   {:else if currentMatch && currentPassage}

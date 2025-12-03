@@ -2,7 +2,7 @@
   export let open: boolean = false;
   export let title: string = '';
   export let message: string = '';
-  export let buttonText: string = 'OK';
+  export let buttonText: string | null = 'OK';
   export let onClose: (() => void) | null = null;
   export let secondaryButtonText: string | null = null;
   export let onSecondaryClick: (() => void) | null = null;
@@ -84,12 +84,14 @@
             {secondaryButtonText}
           </button>
         {/if}
-        <button
-          on:click={handleClose}
-          class="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-md shadow-sm transition-colors border border-blue-600"
-        >
-          {buttonText}
-        </button>
+        {#if buttonText}
+          <button
+            on:click={handleClose}
+            class="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-md shadow-sm transition-colors border border-blue-600"
+          >
+            {buttonText}
+          </button>
+        {/if}
       </div>
     </div>
   </div>

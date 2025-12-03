@@ -253,18 +253,6 @@ Read Passage → Screen Count → Gaze Points → Batch Submit
 Complete 4 → Show Modal → Quiz → Next Passage
 ```
 
-## Key Design Decisions
-
-1. **4 Screens Per Passage**: Ensures users read the passage multiple times, improving comprehension validation
-
-2. **Tournament Continues Across Passages**: Font preferences are evaluated across different content, providing more robust data
-
-3. **Comprehension Quiz After Each Passage**: Validates that users actually read and understood the material, not just clicked through
-
-4. **Double Elimination**: Fair tournament structure ensures no font is eliminated due to a single bad matchup
-
-5. **State Persistence**: Progress saved in sessionStorage allows users to resume if they refresh or navigate away
-
 ## Future Enhancements
 
 - Passage-specific quiz questions

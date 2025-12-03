@@ -17,9 +17,14 @@
   // Fetch quiz questions on mount
   onMount(async () => {
     const studyTextId = sessionStorage.getItem('study_text_id');
+    const passageId = sessionStorage.getItem('current_passage_id');
+    
+    // Prefer passage-specific questions if available, otherwise use study text questions
     const questions = await fetchQuizQuestions(
-      studyTextId ? parseInt(studyTextId, 10) : undefined
+      studyTextId ? parseInt(studyTextId, 10) : undefined,
+      passageId ? parseInt(passageId, 10) : undefined
     );
+    
     if (questions.length > 0) {
       // Remove duplicates based on question ID (keep first occurrence)
       const seen = new Set<string>();
@@ -105,6 +110,41 @@
         <h1 class="text-5xl font-light text-gray-900 tracking-tight">Thank You!</h1>
         <p class="text-xl text-gray-600">You have completed the study.</p>
         <p class="text-gray-500">Your responses have been recorded.</p>
+      </div>
+      <div class="pt-4">
+        <button
+          class="px-6 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors"
+          on:click={() => {
+            // Clear all study-related sessionStorage
+            sessionStorage.removeItem('current_passage_index');
+            sessionStorage.removeItem('current_passage_id');
+            sessionStorage.removeItem('current_screen');
+            sessionStorage.removeItem('total_passages');
+            sessionStorage.removeItem('study_text_id');
+            sessionStorage.removeItem('session_db_id');
+            sessionStorage.removeItem('session_id');
+            sessionStorage.removeItem('calibration_points');
+            sessionStorage.removeItem('font_left');
+            sessionStorage.removeItem('font_right');
+            sessionStorage.removeItem('time_left_ms');
+            sessionStorage.removeItem('time_right_ms');
+            sessionStorage.removeItem('timeA_ms');
+            sessionStorage.removeItem('timeB_ms');
+            sessionStorage.removeItem('font_preference');
+            sessionStorage.removeItem('font_preferred_type');
+            // Clear tournament data
+            const keys = Object.keys(sessionStorage);
+            keys.forEach(key => {
+              if (key.startsWith('match_') || key.startsWith('tournament_')) {
+                sessionStorage.removeItem(key);
+              }
+            });
+            // Navigate to home to start over
+            goto('/');
+          }}
+        >
+          Start Over
+        </button>
       </div>
     </div>
   </div>

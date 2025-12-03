@@ -260,10 +260,26 @@ func handleStudyText(c echo.Context) error {
 	}
 
 	var studyText StudyText
-	if err := db.Preload("Passages").Where("version = ? AND active = ?", version, true).First(&studyText).Error; err != nil {
+	if err := db.Preload("Passages", func(db *gorm.DB) *gorm.DB {
+		return db.Order("`order` ASC")
+	}).Where("version = ? AND active = ?", version, true).First(&studyText).Error; err != nil {
 		// If not found, try to get any active study text
-		if err := db.Preload("Passages").Where("active = ?", true).First(&studyText).Error; err != nil {
+		if err := db.Preload("Passages", func(db *gorm.DB) *gorm.DB {
+			return db.Order("`order` ASC")
+		}).Where("active = ?", true).First(&studyText).Error; err != nil {
 			return c.JSON(404, map[string]string{"error": "No study text found"})
+		}
+	}
+	
+	// Sort passages by order to ensure correct ordering (backup sorting)
+	if len(studyText.Passages) > 1 {
+		// Use bubble sort for simple ordering
+		for i := 0; i < len(studyText.Passages); i++ {
+			for j := i + 1; j < len(studyText.Passages); j++ {
+				if studyText.Passages[i].Order > studyText.Passages[j].Order {
+					studyText.Passages[i], studyText.Passages[j] = studyText.Passages[j], studyText.Passages[i]
+				}
+			}
 		}
 	}
 
@@ -286,21 +302,26 @@ func handleStudyText(c echo.Context) error {
 }
 
 func handleQuizQuestions(c echo.Context) error {
-	// Get study_text_id from query parameter
+	// Get study_text_id and passage_id from query parameters
 	studyTextID := c.QueryParam("study_text_id")
+	passageID := c.QueryParam("passage_id")
 
 	var questions []QuizQuestion
 	query := db.Order("`order` ASC")
 
-	if studyTextID != "" {
-		query = query.Where("study_text_id = ?", studyTextID)
+	// If passage_id is provided, filter by passage (most specific)
+	if passageID != "" {
+		query = query.Where("passage_id = ?", passageID)
+	} else if studyTextID != "" {
+		// If study_text_id provided but no passage_id, get questions for study text (not linked to specific passage)
+		query = query.Where("study_text_id = ? AND passage_id IS NULL", studyTextID)
 	} else {
-		// If no study_text_id provided, get questions for active study text
+		// If no parameters provided, get questions for active study text (not linked to specific passage)
 		var studyText StudyText
 		if err := db.Where("active = ?", true).First(&studyText).Error; err != nil {
 			return c.JSON(404, map[string]string{"error": "No active study text found"})
 		}
-		query = query.Where("study_text_id = ?", studyText.ID)
+		query = query.Where("study_text_id = ? AND passage_id IS NULL", studyText.ID)
 	}
 
 	if err := query.Find(&questions).Error; err != nil {
@@ -606,6 +627,7 @@ func handleAdminQuizQuestion(c echo.Context) error {
 		// Create new quiz question
 		var questionData struct {
 			StudyTextID uint     `json:"study_text_id"`
+			PassageID   *uint    `json:"passage_id,omitempty"`  // Optional: link to specific passage
 			QuestionID  string   `json:"question_id"`
 			Prompt      string   `json:"prompt"`
 			Choices     []string `json:"choices"`
@@ -622,6 +644,14 @@ func handleAdminQuizQuestion(c echo.Context) error {
 			return c.JSON(400, map[string]string{"error": "study_text_id, question_id, and prompt are required"})
 		}
 
+		// If passage_id is provided, verify it exists and belongs to the study_text_id
+		if questionData.PassageID != nil && *questionData.PassageID > 0 {
+			var passage Passage
+			if err := db.Where("id = ? AND study_text_id = ?", *questionData.PassageID, questionData.StudyTextID).First(&passage).Error; err != nil {
+				return c.JSON(404, map[string]string{"error": "Passage not found or does not belong to the specified study text"})
+			}
+		}
+
 		// Convert choices to JSON string
 		choicesJSON, err := json.Marshal(questionData.Choices)
 		if err != nil {
@@ -630,6 +660,7 @@ func handleAdminQuizQuestion(c echo.Context) error {
 
 		question := QuizQuestion{
 			StudyTextID: questionData.StudyTextID,
+			PassageID:   questionData.PassageID,
 			QuestionID:  questionData.QuestionID,
 			Prompt:      questionData.Prompt,
 			Choices:     string(choicesJSON),
@@ -651,6 +682,7 @@ func handleAdminQuizQuestion(c echo.Context) error {
 		// Update existing quiz question
 		var updateData struct {
 			ID         uint      `json:"id"`
+			PassageID  *uint     `json:"passage_id,omitempty"`  // Optional: can update passage link
 			QuestionID string    `json:"question_id,omitempty"`
 			Prompt     string    `json:"prompt,omitempty"`
 			Choices    []string  `json:"choices,omitempty"`
@@ -669,6 +701,17 @@ func handleAdminQuizQuestion(c echo.Context) error {
 		var question QuizQuestion
 		if err := db.First(&question, updateData.ID).Error; err != nil {
 			return c.JSON(404, map[string]string{"error": "Quiz question not found"})
+		}
+
+		// If passage_id is being updated, verify it exists and belongs to the study_text_id
+		if updateData.PassageID != nil {
+			if *updateData.PassageID > 0 {
+				var passage Passage
+				if err := db.Where("id = ? AND study_text_id = ?", *updateData.PassageID, question.StudyTextID).First(&passage).Error; err != nil {
+					return c.JSON(404, map[string]string{"error": "Passage not found or does not belong to the study text"})
+				}
+			}
+			question.PassageID = updateData.PassageID
 		}
 
 		// Update fields
@@ -719,33 +762,116 @@ func handleAdminQuizQuestion(c echo.Context) error {
 		})
 
 	case "GET":
-		// Get single quiz question by ID
+		// Get quiz question(s) - by id, passage_id, or study_text_id
 		id := c.QueryParam("id")
-		if id == "" {
-			return c.JSON(400, map[string]string{"error": "ID parameter is required"})
+		passageID := c.QueryParam("passage_id")
+		studyTextID := c.QueryParam("study_text_id")
+
+		if id != "" {
+			// Get single quiz question by ID
+			var question QuizQuestion
+			if err := db.First(&question, id).Error; err != nil {
+				return c.JSON(404, map[string]string{"error": "Quiz question not found"})
+			}
+
+			// Parse choices JSON
+			var choices []string
+			json.Unmarshal([]byte(question.Choices), &choices)
+
+			return c.JSON(200, map[string]interface{}{
+				"success": true,
+				"data": map[string]interface{}{
+					"id":           question.ID,
+					"study_text_id": question.StudyTextID,
+					"passage_id":   question.PassageID,
+					"question_id":  question.QuestionID,
+					"prompt":       question.Prompt,
+					"choices":      choices,
+					"answer":       question.Answer,
+					"order":        question.Order,
+				},
+			})
+		} else if passageID != "" {
+			// Get all quiz questions for a passage
+			var questions []QuizQuestion
+			if err := db.Where("passage_id = ?", passageID).Order("`order` ASC").Find(&questions).Error; err != nil {
+				return c.JSON(500, map[string]string{"error": "Failed to fetch quiz questions: " + err.Error()})
+			}
+
+			// Format response
+			type QuestionResponse struct {
+				ID          uint      `json:"id"`
+				StudyTextID uint      `json:"study_text_id"`
+				PassageID   *uint     `json:"passage_id"`
+				QuestionID  string    `json:"question_id"`
+				Prompt      string    `json:"prompt"`
+				Choices     []string  `json:"choices"`
+				Answer      int       `json:"answer"`
+				Order       int       `json:"order"`
+			}
+
+			response := make([]QuestionResponse, len(questions))
+			for i, q := range questions {
+				var choices []string
+				json.Unmarshal([]byte(q.Choices), &choices)
+				response[i] = QuestionResponse{
+					ID:          q.ID,
+					StudyTextID: q.StudyTextID,
+					PassageID:   q.PassageID,
+					QuestionID:  q.QuestionID,
+					Prompt:      q.Prompt,
+					Choices:     choices,
+					Answer:      q.Answer,
+					Order:       q.Order,
+				}
+			}
+
+			return c.JSON(200, map[string]interface{}{
+				"success": true,
+				"data":    response,
+			})
+		} else if studyTextID != "" {
+			// Get all quiz questions for a study text (including those linked to passages)
+			var questions []QuizQuestion
+			if err := db.Where("study_text_id = ?", studyTextID).Order("`order` ASC").Find(&questions).Error; err != nil {
+				return c.JSON(500, map[string]string{"error": "Failed to fetch quiz questions: " + err.Error()})
+			}
+
+			// Format response
+			type QuestionResponse struct {
+				ID          uint      `json:"id"`
+				StudyTextID uint      `json:"study_text_id"`
+				PassageID   *uint     `json:"passage_id"`
+				QuestionID  string    `json:"question_id"`
+				Prompt      string    `json:"prompt"`
+				Choices     []string  `json:"choices"`
+				Answer      int       `json:"answer"`
+				Order       int       `json:"order"`
+			}
+
+			response := make([]QuestionResponse, len(questions))
+			for i, q := range questions {
+				var choices []string
+				json.Unmarshal([]byte(q.Choices), &choices)
+				response[i] = QuestionResponse{
+					ID:          q.ID,
+					StudyTextID: q.StudyTextID,
+					PassageID:   q.PassageID,
+					QuestionID:  q.QuestionID,
+					Prompt:      q.Prompt,
+					Choices:     choices,
+					Answer:      q.Answer,
+					Order:       q.Order,
+				}
+			}
+
+			return c.JSON(200, map[string]interface{}{
+				"success": true,
+				"data":    response,
+			})
+		} else {
+			return c.JSON(400, map[string]string{"error": "Either id, passage_id, or study_text_id parameter is required"})
 		}
-
-		var question QuizQuestion
-		if err := db.First(&question, id).Error; err != nil {
-			return c.JSON(404, map[string]string{"error": "Quiz question not found"})
-		}
-
-		// Parse choices JSON
-		var choices []string
-		json.Unmarshal([]byte(question.Choices), &choices)
-
-		return c.JSON(200, map[string]interface{}{
-			"success": true,
-			"data": map[string]interface{}{
-				"id":           question.ID,
-				"study_text_id": question.StudyTextID,
-				"question_id":  question.QuestionID,
-				"prompt":       question.Prompt,
-				"choices":      choices,
-				"answer":       question.Answer,
-				"order":        question.Order,
-			},
-		})
 
 	default:
 		return c.JSON(405, map[string]string{"error": "Method not allowed"})

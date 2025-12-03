@@ -161,7 +161,7 @@
   open={showResultModal}
   title=""
   message={resultMessage}
-  buttonText="OK"
+  buttonText={accuracy >= ACCURACY_THRESHOLD ? 'OK' : null}
   secondaryButtonText={accuracy < ACCURACY_THRESHOLD ? 'Recalibrate' : null}
   onClose={closeResultModal}
   onSecondaryClick={handleRecalibrate}

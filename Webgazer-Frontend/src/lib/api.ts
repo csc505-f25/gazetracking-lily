@@ -308,12 +308,29 @@ export async function fetchStudyText(version?: string): Promise<StudyTextRespons
 
 /**
  * Fetch quiz questions from backend
+ * @param studyTextId - Optional study text ID
+ * @param passageId - Optional passage ID (if provided, fetches questions specific to that passage)
  */
-export async function fetchQuizQuestions(studyTextId?: number): Promise<QuizQuestionResponse[]> {
+export async function fetchQuizQuestions(
+	studyTextId?: number,
+	passageId?: number
+): Promise<QuizQuestionResponse[]> {
 	try {
-		const url = studyTextId
-			? `${API_BASE_URL}/api/quiz-questions?study_text_id=${studyTextId}`
-			: `${API_BASE_URL}/api/quiz-questions`;
+		let url = `${API_BASE_URL}/api/quiz-questions`;
+		const params = new URLSearchParams();
+
+		// If passage_id is provided, use it (most specific)
+		if (passageId) {
+			params.append('passage_id', String(passageId));
+		} else if (studyTextId) {
+			// Otherwise, use study_text_id (gets questions not linked to specific passages)
+			params.append('study_text_id', String(studyTextId));
+		}
+		// If neither provided, backend will use active study text
+
+		if (params.toString()) {
+			url += `?${params.toString()}`;
+		}
 
 		const response = await fetch(url);
 
@@ -363,9 +380,12 @@ export async function submitCompleteSession(quizAnswers: Record<string, number>)
 			const sessionDbId = result.id;
 
 			// Fetch quiz questions from API to get correct answers
+			// Use passage-specific questions if available, otherwise use study text questions
 			const studyTextId = sessionStorage.getItem('study_text_id');
+			const passageId = sessionStorage.getItem('current_passage_id');
 			const quizQuestions = await fetchQuizQuestions(
-				studyTextId ? parseInt(studyTextId, 10) : undefined
+				studyTextId ? parseInt(studyTextId, 10) : undefined,
+				passageId ? parseInt(passageId, 10) : undefined
 			);
 
 			// Submit each quiz response individually

@@ -3,6 +3,32 @@
   let name = '';
 
   function start() {
+    // Clear any previous study session data to allow retaking
+    // Note: participant_id is kept so the same participant can retake
+    sessionStorage.removeItem('current_passage_index');
+    sessionStorage.removeItem('current_passage_id');
+    sessionStorage.removeItem('current_screen');
+    sessionStorage.removeItem('total_passages');
+    sessionStorage.removeItem('study_text_id');
+    sessionStorage.removeItem('session_db_id');
+    sessionStorage.removeItem('session_id');
+    sessionStorage.removeItem('calibration_points');
+    sessionStorage.removeItem('font_left');
+    sessionStorage.removeItem('font_right');
+    sessionStorage.removeItem('time_left_ms');
+    sessionStorage.removeItem('time_right_ms');
+    sessionStorage.removeItem('timeA_ms');
+    sessionStorage.removeItem('timeB_ms');
+    sessionStorage.removeItem('font_preference');
+    sessionStorage.removeItem('font_preferred_type');
+    // Clear tournament data
+    const keys = Object.keys(sessionStorage);
+    keys.forEach(key => {
+      if (key.startsWith('match_') || key.startsWith('tournament_')) {
+        sessionStorage.removeItem(key);
+      }
+    });
+    
     // not used in the flow yet, but persisted for later if needed
     localStorage.setItem('participant_name', name.trim());
     goto('/calibrate');

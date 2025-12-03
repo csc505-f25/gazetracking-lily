@@ -176,10 +176,38 @@ This will swap the fonts - left panel will show sans-serif, right panel will sho
 
 ## Quiz Question Management
 
-### Get Single Quiz Question
+### Passage-Specific Quiz Questions
+
+Quiz questions can be linked to specific passages or to the entire study text:
+
+- **Passage-specific questions**: Set `passage_id` when creating a question. These questions will only appear when fetching questions for that specific passage.
+- **Study text questions**: Omit `passage_id` (or set to `null`). These questions apply to the entire study text and appear when no passage is specified.
+
+**Example workflow:**
+
+1. Create a study text with multiple passages
+2. Create passage-specific quiz questions for each passage using `passage_id`
+3. When users read a passage, fetch questions using `?passage_id=X`
+4. Each passage will have its own set of comprehension questions
+
+### Get Quiz Questions
+
+**Get single quiz question by ID:**
 
 ```bash
 curl http://localhost:8080/api/admin/quiz-question?id=1
+```
+
+**Get all quiz questions for a specific passage:**
+
+```bash
+curl http://localhost:8080/api/admin/quiz-question?passage_id=2
+```
+
+**Get all quiz questions for a study text:**
+
+```bash
+curl http://localhost:8080/api/admin/quiz-question?study_text_id=1
 ```
 
 Response:
@@ -190,6 +218,7 @@ Response:
   "data": {
     "id": 1,
     "study_text_id": 1,
+    "passage_id": 2,
     "question_id": "q1",
     "prompt": "What is the purpose of this passage?",
     "choices": ["Option 1", "Option 2", "Option 3", "Option 4"],
@@ -199,7 +228,32 @@ Response:
 }
 ```
 
+**Note:** `passage_id` is optional. If provided, the question is linked to a specific passage. If `null`, the question applies to the entire study text.
+
 ### Create New Quiz Question
+
+**For a specific passage:**
+
+```bash
+curl -X POST http://localhost:8080/api/admin/quiz-question \
+  -H "Content-Type: application/json" \
+  -d '{
+    "study_text_id": 1,
+    "passage_id": 2,
+    "question_id": "q6",
+    "prompt": "What is the main theme?",
+    "choices": [
+      "Theme A",
+      "Theme B",
+      "Theme C",
+      "Theme D"
+    ],
+    "answer": 0,
+    "order": 6
+  }'
+```
+
+**For the entire study text (no specific passage):**
 
 ```bash
 curl -X POST http://localhost:8080/api/admin/quiz-question \
@@ -228,6 +282,10 @@ curl -X POST http://localhost:8080/api/admin/quiz-question \
 - `answer` (number) - Index of correct answer (0-based)
 - `order` (number) - Display order
 
+**Optional fields:**
+
+- `passage_id` (number, optional) - ID of the specific passage this question belongs to. If omitted or `null`, the question applies to the entire study text.
+
 ### Update Existing Quiz Question
 
 ```bash
@@ -248,6 +306,7 @@ curl -X PUT http://localhost:8080/api/admin/quiz-question \
 
 You can update any combination of:
 
+- `passage_id` (number, optional) - Link question to a specific passage, or set to `null` to unlink
 - `question_id` (string)
 - `prompt` (string)
 - `choices` (array of strings)
@@ -305,6 +364,12 @@ curl -X PUT http://localhost:8080/api/admin/study-text \
 
 ```bash
 curl http://localhost:8080/api/quiz-questions?study_text_id=1 | jq
+```
+
+**Or get questions for a specific passage:**
+
+```bash
+curl http://localhost:8080/api/quiz-questions?passage_id=2 | jq
 ```
 
 ### 4. Update a specific quiz question
