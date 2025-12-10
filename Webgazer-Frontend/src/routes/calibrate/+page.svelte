@@ -102,9 +102,9 @@
 </script>
 
 <WebGazerManager
-  showVideo={true}
-  showFaceOverlay={true}
-  showFaceFeedbackBox={true}
+  showVideo={false}
+  showFaceOverlay={false}
+  showFaceFeedbackBox={false}
   showPredictionPoints={true}
   onInitialized={handleWebGazerInitialized}
   onError={handleWebGazerError}
@@ -149,3 +149,21 @@
   </div>
 
 </div>
+
+<style>
+  /* Hide video overlay on calibration page */
+  :global(video) {
+    display: none !important;
+  }
+
+  /* Position face overlay canvas (with dots) in top-left corner */
+  :global(canvas:not(#webgazerVideoFeedCanvas)) {
+    position: fixed !important;
+    top: 20px !important;
+    left: 20px !important;
+    transform: none !important;
+    width: 300px !important;
+    height: 300px !important;
+    z-index: 40 !important;
+  }
+</style>

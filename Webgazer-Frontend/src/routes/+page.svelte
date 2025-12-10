@@ -1,6 +1,64 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { get } from 'svelte/store';
+  import { webgazerStore, endWebGazer } from '$lib/stores/webgazer';
   let name = '';
+
+  // Hide WebGazer overlay and video on home page
+  onMount(() => {
+    // Hide any existing WebGazer UI elements
+    const hideWebGazerUI = () => {
+      // Hide video element
+      const video = document.querySelector('video');
+      if (video) {
+        video.style.display = 'none';
+      }
+      
+      // Hide face overlay
+      const faceOverlay = document.querySelector('.webgazerFaceFeedbackBox');
+      if (faceOverlay) {
+        (faceOverlay as HTMLElement).style.display = 'none';
+      }
+      
+      // Hide prediction points
+      const predictionPoints = document.querySelectorAll('.webgazerGazeDot');
+      predictionPoints.forEach((dot) => {
+        (dot as HTMLElement).style.display = 'none';
+      });
+    };
+
+    // Hide immediately
+    hideWebGazerUI();
+
+    // Also check if WebGazer is active and hide its UI
+    const storeState = get(webgazerStore);
+    if (storeState.instance && storeState.isActive) {
+      try {
+        if (storeState.instance.showVideo) {
+          storeState.instance.showVideo(false);
+        }
+        if (storeState.instance.showFaceOverlay) {
+          storeState.instance.showFaceOverlay(false);
+        }
+        if (storeState.instance.showFaceFeedbackBox) {
+          storeState.instance.showFaceFeedbackBox(false);
+        }
+        if (storeState.instance.showPredictionPoints) {
+          storeState.instance.showPredictionPoints(false);
+        }
+      } catch (error) {
+        console.warn('Error hiding WebGazer UI:', error);
+      }
+    }
+
+    // Periodically hide in case WebGazer recreates elements
+    const interval = setInterval(hideWebGazerUI, 500);
+
+    return () => {
+      clearInterval(interval);
+    };
+  });
 
   function start() {
     // Clear any previous study session data to allow retaking
@@ -31,7 +89,7 @@
     
     // not used in the flow yet, but persisted for later if needed
     localStorage.setItem('participant_name', name.trim());
-    goto('/calibrate');
+    goto('/setup');
   }
 </script>
 
@@ -41,22 +99,41 @@
       <h1 class="text-5xl font-light text-gray-900 tracking-tight">Readability Study</h1>
     </div>
 
-    <div class="space-y-3">
+    <!-- <div class="space-y-3">
       <input
         id="name-input"
         class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:border-gray-900"
         bind:value={name}
         placeholder="Type your name"
       />
-    </div>
+    </div> -->
 
     <div class="flex items-center justify-center gap-4">
       <button
         class="px-8 py-3 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 transition-colors shadow-sm"
         on:click={start}
       >
-        Start Calibration
+        Start Setup
       </button>
     </div>
   </div>
 </div>
+
+<style>
+  /* Hide all WebGazer UI elements on home page */
+  :global(video) {
+    display: none !important;
+  }
+
+  :global(.webgazerFaceFeedbackBox) {
+    display: none !important;
+  }
+
+  :global(.webgazerGazeDot) {
+    display: none !important;
+  }
+
+  :global(.webgazerVideoFeed) {
+    display: none !important;
+  }
+</style>

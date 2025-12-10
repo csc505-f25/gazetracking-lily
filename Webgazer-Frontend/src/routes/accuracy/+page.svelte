@@ -141,9 +141,9 @@
 </script>
 
 <WebGazerManager
-  showVideo={true}
-  showFaceOverlay={true}
-  showFaceFeedbackBox={true}
+  showVideo={false}
+  showFaceOverlay={false}
+  showFaceFeedbackBox={false}
   showPredictionPoints={true}
   onInitialized={handleWebGazerInitialized}
   onError={handleWebGazerError}

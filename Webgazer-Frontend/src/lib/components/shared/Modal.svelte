@@ -69,9 +69,9 @@
 
       <!-- Message -->
       {#if message}
-        <p class="text-gray-700 text-left leading-relaxed">
+        <div class="text-gray-700 text-left leading-relaxed whitespace-pre-line space-y-1">
           {message}
-        </p>
+        </div>
       {/if}
 
       <!-- Buttons -->
