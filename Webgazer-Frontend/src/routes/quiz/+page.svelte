@@ -4,6 +4,7 @@
   import { fetchQuizQuestions, type QuizQuestionResponse } from '$lib/api';
   import { QuizQuestion } from '$lib/components/quiz';
   import { submitCompleteSession } from '$lib/api';
+  import { Modal } from '$lib/components';
 
   let answers: Record<string, number> = {};
   let submitted = false;
@@ -16,30 +17,53 @@
 
   // Fetch quiz questions on mount
   onMount(async () => {
-    const studyTextId = sessionStorage.getItem('study_text_id');
-    const passageId = sessionStorage.getItem('current_passage_id');
+    // Ensure loading starts as true
+    loading = true;
     
-    // Prefer passage-specific questions if available, otherwise use study text questions
-    const questions = await fetchQuizQuestions(
-      studyTextId ? parseInt(studyTextId, 10) : undefined,
-      passageId ? parseInt(passageId, 10) : undefined
-    );
+    // Add a minimum delay to ensure smooth transition and modal visibility
+    const minDisplayTime = 800; // 800ms minimum for smoother transition
+    const startTime = Date.now();
     
-    if (questions.length > 0) {
-      // Remove duplicates based on question ID (keep first occurrence)
-      const seen = new Set<string>();
-      quizQuestions = questions.filter(q => {
-        if (seen.has(q.id)) {
-          console.warn(`Duplicate question ID found: ${q.id}, skipping duplicate`);
-          return false;
-        }
-        seen.add(q.id);
-        return true;
-      });
-    } else {
+    try {
+      const studyTextId = sessionStorage.getItem('study_text_id');
+      const passageId = sessionStorage.getItem('current_passage_id');
+      
+      // Prefer passage-specific questions if available, otherwise use study text questions
+      const questions = await fetchQuizQuestions(
+        studyTextId ? parseInt(studyTextId, 10) : undefined,
+        passageId ? parseInt(passageId, 10) : undefined
+      );
+      
+      if (questions.length > 0) {
+        // Remove duplicates based on question ID (keep first occurrence)
+        const seen = new Set<string>();
+        quizQuestions = questions.filter(q => {
+          if (seen.has(q.id)) {
+            console.warn(`Duplicate question ID found: ${q.id}, skipping duplicate`);
+            return false;
+          }
+          seen.add(q.id);
+          return true;
+        });
+      } else {
+        submitError = 'Failed to load quiz questions. Please refresh the page.';
+      }
+    } catch (error) {
+      console.error('Error loading quiz questions:', error);
       submitError = 'Failed to load quiz questions. Please refresh the page.';
+    } finally {
+      // Ensure minimum display time for smooth transition
+      const elapsed = Date.now() - startTime;
+      const remainingTime = Math.max(0, minDisplayTime - elapsed);
+      
+      if (remainingTime > 0) {
+        setTimeout(() => {
+          loading = false;
+        }, remainingTime);
+      } else {
+        loading = false;
+      }
     }
-    loading = false;
   });
 
   $: totalPages = Math.ceil(quizQuestions.length / questionsPerPage);
@@ -149,69 +173,96 @@
     </div>
   </div>
 {:else}
-  <!-- Quiz Form -->
-  <div class="min-h-screen bg-white px-4 py-10">
-    <div class="max-w-3xl mx-auto space-y-6">
-      <div class="text-center space-y-2">
-        <h1 class="text-4xl font-light text-gray-900 tracking-tight">Comprehension Quiz</h1>
-        <p class="text-gray-500">Answer the questions about the passage you just read.</p>
-      </div>
+  <!-- Loading Modal - Show immediately when loading -->
+  <Modal
+    open={loading}
+    title="Loading"
+    message="Loading quiz questions. Please wait..."
+    buttonText={null}
+    onClose={null}
+  />
 
-      <form class="space-y-6" on:submit|preventDefault={submit}>
-        {#if submitError}
-          <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            {submitError}
-          </div>
-        {/if}
+  <!-- Background (hidden while loading to prevent flicker) -->
+  {#if loading}
+    <div class="fixed inset-0 bg-white z-0"></div>
+  {/if}
 
-        {#if loading}
-          <div class="text-center py-8">
-            <p class="text-gray-500">Loading quiz questions...</p>
-          </div>
-        {:else if currentQuestions.length === 0}
-          <div class="text-center py-8">
-            <p class="text-red-500">No quiz questions available.</p>
-          </div>
-        {:else}
-          {#each currentQuestions as q, index (q.id + '_' + index)}
-            <QuizQuestion
-              question={q}
-              answer={answers[q.id]}
-              onAnswerChange={handleAnswerChange}
-            />
-          {/each}
-        {/if}
-      </form>
+  <!-- Quiz Form (completely hidden while loading, with fade transition) -->
+  {#if !loading && quizQuestions.length > 0}
+    <div class="min-h-screen bg-white px-4 py-10 animate-fade-in">
+      <div class="max-w-3xl mx-auto space-y-6">
+        <div class="text-center space-y-2">
+          <h1 class="text-4xl font-light text-gray-900 tracking-tight">Comprehension Quiz</h1>
+          <p class="text-gray-500">Answer the questions about the passage you just read.</p>
+        </div>
 
-      <div class="flex items-center justify-between pt-4">
-        <button
-          type="button"
-          class="px-6 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-          on:click={previousPage}
-          disabled={currentPage === 0}
-        >Previous</button>
+        <form class="space-y-6" on:submit|preventDefault={submit}>
+          {#if submitError}
+            <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              {submitError}
+            </div>
+          {/if}
 
-        <span class="text-gray-600">
-          Page {currentPage + 1} of {totalPages}
-        </span>
+          {#if currentQuestions.length === 0}
+            <div class="text-center py-8">
+              <p class="text-red-500">No quiz questions available.</p>
+            </div>
+          {:else}
+            {#each currentQuestions as q, index (q.id + '_' + index)}
+              <QuizQuestion
+                question={q}
+                answer={answers[q.id]}
+                onAnswerChange={handleAnswerChange}
+              />
+            {/each}
+          {/if}
+        </form>
 
-        {#if currentPage === totalPages - 1}
-          <button
-            class="px-6 py-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            type="button"
-            on:click={submit}
-            disabled={submitting}
-          >
-            {submitting ? 'Submitting...' : 'Submit'}
-          </button>
-        {:else}
+        <div class="flex items-center justify-between pt-4">
           <button
             type="button"
-            class="px-6 py-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800"
-            on:click={nextPage}
-          >Next</button>
-        {/if}
+            class="px-6 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            on:click={previousPage}
+            disabled={currentPage === 0}
+          >Previous</button>
+
+          <span class="text-gray-600">
+            Page {currentPage + 1} of {totalPages}
+          </span>
+
+          {#if currentPage === totalPages - 1}
+            <button
+              class="px-6 py-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              type="button"
+              on:click={submit}
+              disabled={submitting}
+            >
+              {submitting ? 'Submitting...' : 'Submit'}
+            </button>
+          {:else}
+            <button
+              type="button"
+              class="px-6 py-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800"
+              on:click={nextPage}
+            >Next</button>
+          {/if}
+        </div>
       </div>
     </div>
-  </div>
+  {/if}
 {/if}
+
+<style>
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-in;
+  }
+</style>

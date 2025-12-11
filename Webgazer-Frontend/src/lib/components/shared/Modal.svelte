@@ -67,12 +67,12 @@
 {#if open}
   <!-- Backdrop -->
   <div
-    class="modal-backdrop fixed inset-0 bg-gray-100 flex items-center justify-center p-4"
-    on:click={handleBackdropClick}
-    on:keydown={handleKeydown}
-    role="button"
-    tabindex="0"
-    aria-label="Close modal"
+    class="modal-backdrop fixed inset-0 bg-gray-100 z-[9999] flex items-center justify-center p-4"
+    on:click={onClose ? handleBackdropClick : undefined}
+    on:keydown={onClose ? handleKeydown : undefined}
+    role="dialog"
+    tabindex={onClose ? 0 : undefined}
+    aria-label={onClose ? "Close modal" : "Loading"}
     style="pointer-events: auto; visibility: visible !important; opacity: 1 !important; z-index: 9999 !important;"
   >
     <!-- Modal -->

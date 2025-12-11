@@ -139,14 +139,16 @@
     </div>
   </div>
 
-  <!-- Calibration grid - full width and height -->
-  <div class="flex-1 w-full min-h-0">
-    <CalibrationGrid
-      clicksPerPoint={CLICKS_PER_POINT}
-      counts={counts}
-      onPointClick={handlePointClick}
-    />
-  </div>
+  <!-- Calibration grid - full width and height (hidden when modal is open) -->
+  {#if !showInstructionModal}
+    <div class="flex-1 w-full min-h-0">
+      <CalibrationGrid
+        clicksPerPoint={CLICKS_PER_POINT}
+        counts={counts}
+        onPointClick={handlePointClick}
+      />
+    </div>
+  {/if}
 
 </div>
 

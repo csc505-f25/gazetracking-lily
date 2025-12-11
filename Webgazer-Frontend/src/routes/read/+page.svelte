@@ -27,6 +27,7 @@
   let loading = true;
   let showInstructionModal = false;
   let showQuizTransitionModal = false;
+  let navigatingToQuiz = false;
   
   // Font comparison state
   let comparisonState: FontComparisonState | null = null;
@@ -269,7 +270,11 @@
 
   function handleQuizTransitionModalClose() {
     showQuizTransitionModal = false;
-    goto('/quiz');
+    navigatingToQuiz = true;
+    // Small delay to ensure smooth transition
+    setTimeout(() => {
+      goto('/quiz');
+    }, 100);
   }
 
   function completeA() {
@@ -419,6 +424,15 @@
   onClose={handleQuizTransitionModalClose}
 />
 
+<!-- Loading Modal when navigating to quiz -->
+<Modal
+  open={navigatingToQuiz}
+  title="Loading"
+  message="Preparing quiz questions. Please wait..."
+  buttonText={null}
+  onClose={null}
+/>
+
 <div class="min-h-screen bg-gray-100 flex flex-col">
   {#if loading}
     <div class="flex-1 flex items-center justify-center">
@@ -472,7 +486,7 @@
         </div>
       </div>
     </div>
-  {:else if currentComparison && currentPassage}
+  {:else if currentComparison && currentPassage && !showQuizTransitionModal && !navigatingToQuiz}
     <div class="flex-1 flex flex-col items-center justify-center px-8 py-10 bg-gray-100">
       <div class="flex-1 w-full flex flex-col items-center justify-center gap-8 px-8">
         <div class="text-center mb-6">
