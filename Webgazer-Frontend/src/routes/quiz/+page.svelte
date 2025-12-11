@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { fetchQuizQuestions, type QuizQuestionResponse } from '$lib/api';
+  import { fetchQuizQuestions, type QuizQuestionResponse, adminGetStatistics } from '$lib/api';
   import { QuizQuestion } from '$lib/components/quiz';
   import { submitCompleteSession } from '$lib/api';
   import { Modal } from '$lib/components';
@@ -13,6 +13,7 @@
   let currentPage = 0;
   let quizQuestions: QuizQuestionResponse[] = [];
   let loading = true;
+  let funStat: string | null = null;
   const questionsPerPage = 5;
 
   // Fetch quiz questions on mount
@@ -113,6 +114,8 @@
         } else {
           // All passages completed
           submitted = true;
+          // Fetch fun statistic
+          loadFunStat();
         }
       } else {
         submitError = 'Failed to submit responses. Please try again.';
@@ -122,6 +125,87 @@
       console.error('Error submitting quiz:', error);
       submitError = error instanceof Error ? error.message : 'An error occurred while submitting.';
       submitting = false;
+    }
+  }
+
+  async function loadFunStat() {
+    try {
+      const stats = await adminGetStatistics();
+      const userPreferredFont = sessionStorage.getItem('font_preferred_type');
+      const participantId = sessionStorage.getItem('participant_id');
+      
+      // Build list of available facts
+      const facts: string[] = [];
+      
+      // Fact 1: Most participants prefer [font]
+      if (stats.font_preferences.total > 0) {
+        const mostPreferred = stats.font_preferences.serif > stats.font_preferences.sans ? 'Serif' : 
+                             stats.font_preferences.sans > stats.font_preferences.serif ? 'Sans-Serif' : null;
+        if (mostPreferred) {
+          facts.push(`Most participants prefer ${mostPreferred} fonts!`);
+        }
+      }
+      
+      // Fact 2: Gaze tracking data points
+      if (stats.gaze_points.total > 0) {
+        const gazePoints = stats.gaze_points.total;
+        if (gazePoints >= 1000) {
+          facts.push(`Together, we've collected over ${Math.floor(gazePoints / 1000)}K gaze tracking data points!`);
+        } else {
+          facts.push(`Together, we've collected over ${gazePoints} gaze tracking data points!`);
+        }
+      }
+      
+      // Fact 3: Average reading time
+      if (stats.reading_times.total_sessions > 0) {
+        const avgSerif = stats.reading_times.average_serif_ms / 1000;
+        const avgSans = stats.reading_times.average_sans_ms / 1000;
+        if (avgSerif > 0 || avgSans > 0) {
+          const avgTime = avgSerif > 0 && avgSans > 0 ? (avgSerif + avgSans) / 2 : (avgSerif || avgSans);
+          facts.push(`The average participant reads ${avgTime.toFixed(1)} seconds per passage!`);
+        }
+      }
+      
+      // Fact 4: User's preferred font with percentage agreement
+      if (userPreferredFont && stats.font_preferences.total > 0) {
+        const fontName = userPreferredFont === 'serif' ? 'Serif' : 'Sans-Serif';
+        const userFontCount = userPreferredFont === 'serif' ? stats.font_preferences.serif : stats.font_preferences.sans;
+        const percentage = Math.round((userFontCount / stats.font_preferences.total) * 100);
+        facts.push(`Your preferred font is ${fontName}! ${percentage}% of participants agree with you!`);
+      }
+      
+      // Fact 5: Participant number
+      if (participantId && stats.participants.total > 0) {
+        const participantNum = parseInt(participantId, 10);
+        if (participantNum > 0) {
+          facts.push(`You're participant #${participantNum} in our study!`);
+        }
+      }
+      
+      // Fact 6: User's font matches percentage (similar to fact 4, but different wording)
+      if (userPreferredFont && stats.font_preferences.total > 0) {
+        const fontName = userPreferredFont === 'serif' ? 'Serif' : 'Sans-Serif';
+        const userFontCount = userPreferredFont === 'serif' ? stats.font_preferences.serif : stats.font_preferences.sans;
+        const percentage = Math.round((userFontCount / stats.font_preferences.total) * 100);
+        // Only add if we don't already have fact 4 (to avoid duplicates)
+        if (!facts.some(f => f.includes('agree with you'))) {
+          facts.push(`Your preferred font matches ${percentage}% of other participants' choices!`);
+        }
+      }
+      
+      // Randomly select one fact to show
+      if (facts.length > 0) {
+        const randomIndex = Math.floor(Math.random() * facts.length);
+        funStat = facts[randomIndex];
+      }
+    } catch (error) {
+      console.error('Error loading fun stat:', error);
+      // Fallback to simple preferred font if stats fail
+      const userPreferredFont = sessionStorage.getItem('font_preferred_type');
+      if (userPreferredFont) {
+        const fontName = userPreferredFont === 'serif' ? 'Serif' : 'Sans-Serif';
+        funStat = `Your preferred font is ${fontName}!`;
+      }
     }
   }
 </script>
@@ -134,6 +218,13 @@
         <h1 class="text-5xl font-light text-gray-900 tracking-tight">Thank You!</h1>
         <p class="text-xl text-gray-600">You have completed the study.</p>
         <p class="text-gray-500">Your responses have been recorded.</p>
+        {#if funStat}
+          <div class="mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg">
+            <p class="text-purple-800 text-lg">
+              <span class="font-semibold">Did You Know?</span> {funStat}
+            </p>
+          </div>
+        {/if}
       </div>
       <div class="pt-4">
         <button
