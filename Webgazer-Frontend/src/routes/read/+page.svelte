@@ -59,7 +59,7 @@
   const GAZE_BATCH_SIZE = 10; // Submit in batches of 10 points
 
   // Gaze indicator (red dot) - set to false for production deployment
-  const SHOW_GAZE_INDICATOR = true;
+  const SHOW_GAZE_INDICATOR = false;
   let currentGaze: { x: number; y: number } | null = null;
   let hasGaze = false;
   let gazeUnsubscribe: (() => void) | null = null;

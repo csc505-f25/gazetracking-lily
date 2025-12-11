@@ -169,7 +169,7 @@
 
 <div class="h-screen bg-white flex flex-col overflow-hidden">
   <!-- Header section - centered with max width -->
-  <div class="flex-shrink-0 w-full flex justify-center px-4 py-4">
+  <!-- <div class="flex-shrink-0 w-full flex justify-center px-4 py-4">
     <div class="w-full max-w-3xl space-y-3 text-center">
       <div class="space-y-1">
         <h1 class="text-3xl font-light text-gray-900 tracking-tight">Accuracy Check</h1>
@@ -178,7 +178,7 @@
         </p>
       </div>
     </div>
-  </div>
+  </div> -->
 
   <!-- Accuracy measurer - full width and height -->
   <div class="flex-1 w-full px-4 pb-2 min-h-0">

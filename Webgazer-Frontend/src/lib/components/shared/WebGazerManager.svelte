@@ -25,7 +25,14 @@
       // The camera stream should already be active, we just need to show/hide the video element
       try {
         if (showVideo && instance.showVideo) {
+          // Call showVideo multiple times to ensure it takes effect
           instance.showVideo(true);
+          // Retry after a short delay in case video element isn't ready yet
+          setTimeout(() => {
+            if (instance.showVideo) {
+              instance.showVideo(true);
+            }
+          }, 200);
         } else if (instance.showVideo) {
           instance.showVideo(false);
         }

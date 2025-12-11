@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { onDestroy } from 'svelte';
+  
   export let open: boolean = false;
   export let title: string = '';
   export let message: string = '';
@@ -6,6 +9,27 @@
   export let onClose: (() => void) | null = null;
   export let secondaryButtonText: string | null = null;
   export let onSecondaryClick: (() => void) | null = null;
+
+  // Hide body content when modal is open
+  $: if (open) {
+    if (typeof document !== 'undefined') {
+      document.body.classList.add('modal-open');
+      document.body.style.overflow = 'hidden';
+    }
+  } else {
+    if (typeof document !== 'undefined') {
+      document.body.classList.remove('modal-open');
+      document.body.style.overflow = '';
+    }
+  }
+
+  onDestroy(() => {
+    // Clean up on component destroy
+    if (typeof document !== 'undefined') {
+      document.body.classList.remove('modal-open');
+      document.body.style.overflow = '';
+    }
+  });
 
   function handleClose() {
     if (onClose) {
@@ -43,12 +67,13 @@
 {#if open}
   <!-- Backdrop -->
   <div
-    class="fixed inset-0 bg-gray-900/50 z-50 flex items-center justify-center p-4"
+    class="modal-backdrop fixed inset-0 bg-gray-100 flex items-center justify-center p-4"
     on:click={handleBackdropClick}
     on:keydown={handleKeydown}
     role="button"
     tabindex="0"
     aria-label="Close modal"
+    style="pointer-events: auto; visibility: visible !important; opacity: 1 !important; z-index: 9999 !important;"
   >
     <!-- Modal -->
     <div
@@ -96,4 +121,29 @@
     </div>
   </div>
 {/if}
+
+<style>
+  /* Prevent body scroll when modal is open */
+  :global(body.modal-open) {
+    overflow: hidden !important;
+  }
+
+  /* Ensure modal backdrop is always visible and on top */
+  :global(.modal-backdrop) {
+    visibility: visible !important;
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    z-index: 9999 !important;
+    position: fixed !important;
+  }
+
+  /* Ensure modal content inside backdrop is visible */
+  :global(.modal-backdrop > *) {
+    visibility: visible !important;
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 10000 !important;
+  }
+</style>
 

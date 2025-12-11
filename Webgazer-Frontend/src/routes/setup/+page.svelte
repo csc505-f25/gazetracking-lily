@@ -6,6 +6,7 @@
   import { webgazerStore } from '$lib/stores/webgazer';
 
   let showInstructionModal = true;
+  let showLoadingModal = false;
   let webGazerReady = false;
   let wgInstance: any = null;
 
@@ -20,6 +21,17 @@ Once you close this modal, we'll show a face overlay to help you position yourse
 
   function closeInstructionModal() {
     showInstructionModal = false;
+    // Show loading modal if WebGazer is not ready yet
+    // Check both the local state and the store
+    const storeState = get(webgazerStore);
+    if (!webGazerReady && !storeState.isInitialized) {
+      showLoadingModal = true;
+    }
+  }
+
+  // Reactive statement to hide loading modal when WebGazer becomes ready
+  $: if (webGazerReady && showLoadingModal) {
+    showLoadingModal = false;
   }
 
   function handleWebGazerInitialized(instance: any) {
@@ -27,16 +39,32 @@ Once you close this modal, we'll show a face overlay to help you position yourse
     webGazerReady = true;
     console.log('WebGazer initialized for setup', instance);
     
+    // Hide loading modal once WebGazer is ready
+    showLoadingModal = false;
+    
     // Also get from store as backup
     const storeState = get(webgazerStore);
     if (storeState.instance && !wgInstance) {
       wgInstance = storeState.instance;
     }
 
-    // Style the face overlay to be centered and large
+    // Ensure video is shown
+    if (instance && instance.showVideo) {
+      try {
+        instance.showVideo(true);
+      } catch (error) {
+        console.warn('Error showing video on init:', error);
+      }
+    }
+
+    // Style the face overlay immediately and then retry
+    styleFaceOverlay();
     setTimeout(() => {
       styleFaceOverlay();
-    }, 500);
+    }, 300);
+    setTimeout(() => {
+      styleFaceOverlay();
+    }, 1000);
   }
 
   function handleWebGazerError(error: string) {
@@ -76,9 +104,22 @@ Once you close this modal, we'll show a face overlay to help you position yourse
       overlay.style.setProperty('box-shadow', '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', 'important');
     }
 
-    // Also style the video element if it exists (make it larger and centered)
-    const video = document.querySelector('video') as HTMLVideoElement;
+    // Find and style the video element if it exists (make it larger and centered)
+    // Try multiple selectors to find the video
+    let video = document.querySelector('video') as HTMLVideoElement;
+    if (!video) {
+      // Try finding video in WebGazer's container
+      const webgazerContainer = document.querySelector('[id*="webgazer"]') as HTMLElement;
+      if (webgazerContainer) {
+        video = webgazerContainer.querySelector('video') as HTMLVideoElement;
+      }
+    }
+    
     if (video) {
+      // Ensure video is visible
+      video.style.setProperty('display', 'block', 'important');
+      video.style.setProperty('visibility', 'visible', 'important');
+      video.style.setProperty('opacity', '1', 'important');
       video.style.setProperty('position', 'fixed', 'important');
       video.style.setProperty('top', '50%', 'important');
       video.style.setProperty('left', '50%', 'important');
@@ -88,6 +129,18 @@ Once you close this modal, we'll show a face overlay to help you position yourse
       video.style.setProperty('object-fit', 'cover', 'important');
       video.style.setProperty('border-radius', '8px', 'important');
       video.style.setProperty('z-index', '30', 'important');
+      
+      // Ensure video is playing
+      if (video.paused && video.readyState >= 2) {
+        video.play().catch(err => console.warn('Video play failed:', err));
+      }
+    } else if (wgInstance && wgInstance.showVideo) {
+      // If video element doesn't exist yet, ensure WebGazer shows it
+      try {
+        wgInstance.showVideo(true);
+      } catch (error) {
+        console.warn('Error showing video:', error);
+      }
     }
   }
 
@@ -96,12 +149,34 @@ Once you close this modal, we'll show a face overlay to help you position yourse
   }
 
   onMount(() => {
-    // Re-style overlay periodically in case WebGazer recreates it
+    // Check if WebGazer is already initialized
+    const storeState = get(webgazerStore);
+    if (storeState.isInitialized && storeState.instance) {
+      webGazerReady = true;
+      wgInstance = storeState.instance;
+      showLoadingModal = false;
+      
+      // Ensure video is shown if reusing instance
+      if (storeState.instance.showVideo) {
+        try {
+          storeState.instance.showVideo(true);
+        } catch (error) {
+          console.warn('Error showing video on mount:', error);
+        }
+      }
+      
+      // Style immediately
+      setTimeout(() => {
+        styleFaceOverlay();
+      }, 100);
+    }
+
+    // Re-style overlay periodically in case WebGazer recreates it or video loads late
     const interval = setInterval(() => {
       if (webGazerReady) {
         styleFaceOverlay();
       }
-    }, 1000);
+    }, 500); // Check more frequently
 
     return () => {
       clearInterval(interval);
@@ -124,6 +199,14 @@ Once you close this modal, we'll show a face overlay to help you position yourse
   message={instructionMessage}
   buttonText="Got it"
   onClose={closeInstructionModal}
+/>
+
+<Modal
+  open={showLoadingModal}
+  title="Loading"
+  message="Initializing camera and eye-tracking system. Please wait..."
+  buttonText={null}
+  onClose={null}
 />
 
 <div class="min-h-screen bg-white flex flex-col items-center justify-center px-4 relative">
