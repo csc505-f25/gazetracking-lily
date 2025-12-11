@@ -13,17 +13,20 @@
 		adminCreateQuizQuestion,
 		adminUpdateQuizQuestion,
 		adminDeleteQuizQuestion,
+		adminGetStatistics,
 		type AdminStudyText,
 		type AdminPassage,
-		type AdminQuizQuestion
+		type AdminQuizQuestion,
+		type Statistics
 	} from '$lib/api';
 
-	type Tab = 'passages' | 'quiz-questions';
+	type Tab = 'passages' | 'quiz-questions' | 'analytics';
 
 	let activeTab: Tab = 'passages';
 	let loading = false;
 	let error: string | null = null;
 	let successMessage: string | null = null;
+	let statistics: Statistics | null = null;
 
 	// Study Texts (needed for passages and quiz questions)
 	let studyTexts: AdminStudyText[] = [];
@@ -384,6 +387,18 @@
 		}
 	}
 
+	async function loadStatistics() {
+		loading = true;
+		error = null;
+		try {
+			statistics = await adminGetStatistics();
+		} catch (e) {
+			showError(e instanceof Error ? e.message : 'Failed to load statistics');
+		} finally {
+			loading = false;
+		}
+	}
+
 	async function switchTab(tab: Tab) {
 		activeTab = tab;
 		error = null;
@@ -396,6 +411,8 @@
 		} else if (tab === 'quiz-questions') {
 			await loadStudyTexts(); // Need study texts for quiz form
 			await loadQuizQuestions();
+		} else if (tab === 'analytics') {
+			await loadStatistics();
 		}
 	}
 
@@ -443,6 +460,14 @@
 							: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
 					>
 						Quiz Questions
+					</button>
+					<button
+						onclick={() => switchTab('analytics')}
+						class="py-4 px-1 border-b-2 font-medium text-sm {activeTab === 'analytics'
+							? 'border-blue-500 text-blue-600'
+							: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+					>
+						Analytics
 					</button>
 				</nav>
 			</div>
@@ -839,6 +864,196 @@
 								</div>
 							</div>
 						</div>
+					{/if}
+				{:else if activeTab === 'analytics'}
+					<!-- Analytics Tab -->
+					<div class="mb-4">
+						<h2 class="text-xl font-semibold text-gray-900">Study Analytics</h2>
+						<p class="mt-1 text-sm text-gray-500">Overview of study data and statistics</p>
+					</div>
+
+					{#if loading}
+						<div class="text-center py-12">
+							<div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+							<p class="mt-2 text-sm text-gray-500">Loading statistics...</p>
+						</div>
+					{:else if statistics}
+						<div class="space-y-6">
+							<!-- Summary Cards -->
+							<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+								<div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+									<div class="text-sm font-medium text-blue-600">Participants</div>
+									<div class="text-2xl font-bold text-blue-900 mt-1">{statistics.participants.total}</div>
+								</div>
+								<div class="bg-green-50 border border-green-200 rounded-lg p-4">
+									<div class="text-sm font-medium text-green-600">Sessions</div>
+									<div class="text-2xl font-bold text-green-900 mt-1">{statistics.sessions.total}</div>
+								</div>
+								<div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+									<div class="text-sm font-medium text-purple-600">Quiz Responses</div>
+									<div class="text-2xl font-bold text-purple-900 mt-1">{statistics.quiz_performance.total_responses}</div>
+								</div>
+								<div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+									<div class="text-sm font-medium text-orange-600">Gaze Points</div>
+									<div class="text-2xl font-bold text-orange-900 mt-1">{statistics.gaze_points.total.toLocaleString()}</div>
+								</div>
+							</div>
+
+							<!-- Font Preferences -->
+							<div class="bg-white border border-gray-200 rounded-lg p-6">
+								<h3 class="text-lg font-semibold text-gray-900 mb-4">Font Preferences</h3>
+								{#if statistics.font_preferences.total > 0}
+									<div class="space-y-4">
+										<div>
+											<div class="flex justify-between text-sm mb-1">
+												<span>Serif</span>
+												<span class="font-medium">{statistics.font_preferences.serif} ({Math.round(statistics.font_preferences.serif / statistics.font_preferences.total * 100)}%)</span>
+											</div>
+											<div class="w-full bg-gray-200 rounded-full h-4">
+												<div class="bg-blue-600 h-4 rounded-full" style="width: {statistics.font_preferences.serif / statistics.font_preferences.total * 100}%"></div>
+											</div>
+										</div>
+										<div>
+											<div class="flex justify-between text-sm mb-1">
+												<span>Sans-Serif</span>
+												<span class="font-medium">{statistics.font_preferences.sans} ({Math.round(statistics.font_preferences.sans / statistics.font_preferences.total * 100)}%)</span>
+											</div>
+											<div class="w-full bg-gray-200 rounded-full h-4">
+												<div class="bg-green-600 h-4 rounded-full" style="width: {statistics.font_preferences.sans / statistics.font_preferences.total * 100}%"></div>
+											</div>
+										</div>
+									</div>
+								{:else}
+									<p class="text-gray-500 text-sm">No font preference data available</p>
+								{/if}
+							</div>
+
+							<!-- Quiz Performance -->
+							<div class="bg-white border border-gray-200 rounded-lg p-6">
+								<h3 class="text-lg font-semibold text-gray-900 mb-4">Quiz Performance</h3>
+								{#if statistics.quiz_performance.total_responses > 0}
+									<div class="space-y-4">
+										<div class="flex items-center justify-between">
+											<span class="text-sm text-gray-600">Average Accuracy</span>
+											<span class="text-2xl font-bold text-gray-900">{statistics.quiz_performance.average_accuracy.toFixed(1)}%</span>
+										</div>
+										<div class="flex items-center justify-between">
+											<span class="text-sm text-gray-600">Correct Answers</span>
+											<span class="text-lg font-semibold text-green-600">{statistics.quiz_performance.correct_answers} / {statistics.quiz_performance.total_responses}</span>
+										</div>
+										{#if Object.keys(statistics.quiz_performance.by_question).length > 0}
+											<div class="mt-4 pt-4 border-t border-gray-200">
+												<h4 class="text-sm font-medium text-gray-700 mb-3">Performance by Question</h4>
+												<div class="space-y-2">
+													{#each Object.entries(statistics.quiz_performance.by_question) as [questionId, perf]}
+														<div class="flex items-center justify-between text-sm">
+															<span class="text-gray-600">{questionId}</span>
+															<span class="font-medium">{perf.correct}/{perf.total} ({perf.accuracy.toFixed(1)}%)</span>
+														</div>
+													{/each}
+												</div>
+											</div>
+										{/if}
+									</div>
+								{:else}
+									<p class="text-gray-500 text-sm">No quiz data available</p>
+								{/if}
+							</div>
+
+							<!-- Reading Times -->
+							<div class="bg-white border border-gray-200 rounded-lg p-6">
+								<h3 class="text-lg font-semibold text-gray-900 mb-4">Average Reading Times</h3>
+								{#if statistics.reading_times.total_sessions > 0}
+									<div class="grid grid-cols-2 gap-4">
+										<div>
+											<div class="text-sm text-gray-600">Serif</div>
+											<div class="text-2xl font-bold text-gray-900 mt-1">{(statistics.reading_times.average_serif_ms / 1000).toFixed(1)}s</div>
+										</div>
+										<div>
+											<div class="text-sm text-gray-600">Sans-Serif</div>
+											<div class="text-2xl font-bold text-gray-900 mt-1">{(statistics.reading_times.average_sans_ms / 1000).toFixed(1)}s</div>
+										</div>
+									</div>
+								{:else}
+									<p class="text-gray-500 text-sm">No reading time data available</p>
+								{/if}
+							</div>
+
+							<!-- Accuracy Measurements -->
+							<div class="bg-white border border-gray-200 rounded-lg p-6">
+								<h3 class="text-lg font-semibold text-gray-900 mb-4">Calibration Accuracy</h3>
+								{#if statistics.accuracy_measurements.total > 0}
+									<div class="space-y-4">
+										<div class="flex items-center justify-between">
+											<span class="text-sm text-gray-600">Average Accuracy</span>
+											<span class="text-2xl font-bold text-gray-900">{statistics.accuracy_measurements.average_accuracy.toFixed(1)}%</span>
+										</div>
+										<div class="grid grid-cols-2 gap-4">
+											<div>
+												<div class="text-sm text-gray-600">Passed</div>
+												<div class="text-xl font-semibold text-green-600 mt-1">{statistics.accuracy_measurements.passed}</div>
+											</div>
+											<div>
+												<div class="text-sm text-gray-600">Failed</div>
+												<div class="text-xl font-semibold text-red-600 mt-1">{statistics.accuracy_measurements.failed}</div>
+											</div>
+										</div>
+									</div>
+								{:else}
+									<p class="text-gray-500 text-sm">No accuracy data available</p>
+								{/if}
+							</div>
+
+							<!-- Gaze Points Breakdown -->
+							<div class="bg-white border border-gray-200 rounded-lg p-6">
+								<h3 class="text-lg font-semibold text-gray-900 mb-4">Gaze Points</h3>
+								<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+									<div>
+										<h4 class="text-sm font-medium text-gray-700 mb-3">By Phase</h4>
+										<div class="space-y-2">
+											{#each Object.entries(statistics.gaze_points.by_phase) as [phase, count]}
+												<div class="flex justify-between text-sm">
+													<span class="text-gray-600 capitalize">{phase}</span>
+													<span class="font-medium">{count.toLocaleString()}</span>
+												</div>
+											{:else}
+												<p class="text-gray-500 text-sm">No phase data</p>
+											{/each}
+										</div>
+									</div>
+									<div>
+										<h4 class="text-sm font-medium text-gray-700 mb-3">By Panel</h4>
+										<div class="space-y-2">
+											{#each Object.entries(statistics.gaze_points.by_panel) as [panel, count]}
+												<div class="flex justify-between text-sm">
+													<span class="text-gray-600">{panel}</span>
+													<span class="font-medium">{count.toLocaleString()}</span>
+												</div>
+											{:else}
+												<p class="text-gray-500 text-sm">No panel data</p>
+											{/each}
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<!-- Participants by Source -->
+							{#if Object.keys(statistics.participants.by_source).length > 0}
+								<div class="bg-white border border-gray-200 rounded-lg p-6">
+									<h3 class="text-lg font-semibold text-gray-900 mb-4">Participants by Source</h3>
+									<div class="space-y-2">
+										{#each Object.entries(statistics.participants.by_source) as [source, count]}
+											<div class="flex justify-between text-sm">
+												<span class="text-gray-600">{source || 'Unknown'}</span>
+												<span class="font-medium">{count}</span>
+											</div>
+										{/each}
+									</div>
+								</div>
+							{/if}
+						</div>
+					{:else}
+						<div class="text-center py-12 text-gray-500">No statistics available</div>
 					{/if}
 				{/if}
 			</div>

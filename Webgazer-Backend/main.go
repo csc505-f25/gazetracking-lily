@@ -82,6 +82,7 @@ func main() {
 			admin.PUT("/quiz-question", handleAdminQuizQuestion)
 			admin.DELETE("/quiz-question", handleAdminQuizQuestion)
 			admin.GET("/quiz-question", handleAdminQuizQuestion)
+			admin.GET("/statistics", handleAdminStatistics)
 		}
 	}
 
@@ -876,5 +877,199 @@ func handleAdminQuizQuestion(c echo.Context) error {
 	default:
 		return c.JSON(405, map[string]string{"error": "Method not allowed"})
 	}
+}
+
+func handleAdminStatistics(c echo.Context) error {
+	type Statistics struct {
+		Participants struct {
+			Total   int64            `json:"total"`
+			BySource map[string]int64 `json:"by_source"`
+		} `json:"participants"`
+		Sessions struct {
+			Total int64 `json:"total"`
+		} `json:"sessions"`
+		FontPreferences struct {
+			Serif int64 `json:"serif"`
+			Sans  int64 `json:"sans"`
+			Total int64 `json:"total"`
+		} `json:"font_preferences"`
+		QuizPerformance struct {
+			TotalResponses   int64   `json:"total_responses"`
+			CorrectAnswers   int64   `json:"correct_answers"`
+			AverageAccuracy  float64 `json:"average_accuracy"`
+			ByQuestion       map[string]struct {
+				Total    int64   `json:"total"`
+				Correct  int64   `json:"correct"`
+				Accuracy float64 `json:"accuracy"`
+			} `json:"by_question"`
+		} `json:"quiz_performance"`
+		ReadingTimes struct {
+			AverageSerif float64 `json:"average_serif_ms"`
+			AverageSans  float64 `json:"average_sans_ms"`
+			TotalSessions int64  `json:"total_sessions"`
+		} `json:"reading_times"`
+		AccuracyMeasurements struct {
+			Total          int64   `json:"total"`
+			AverageAccuracy float64 `json:"average_accuracy"`
+			Passed         int64   `json:"passed"`
+			Failed         int64   `json:"failed"`
+		} `json:"accuracy_measurements"`
+		GazePoints struct {
+			Total      int64            `json:"total"`
+			ByPhase    map[string]int64 `json:"by_phase"`
+			ByPanel    map[string]int64 `json:"by_panel"`
+		} `json:"gaze_points"`
+		CalibrationData struct {
+			Total int64 `json:"total"`
+		} `json:"calibration_data"`
+	}
+
+	var stats Statistics
+
+	// Initialize maps
+	stats.Participants.BySource = make(map[string]int64)
+	stats.QuizPerformance.ByQuestion = make(map[string]struct {
+		Total    int64   `json:"total"`
+		Correct  int64   `json:"correct"`
+		Accuracy float64 `json:"accuracy"`
+	})
+	stats.GazePoints.ByPhase = make(map[string]int64)
+	stats.GazePoints.ByPanel = make(map[string]int64)
+
+	// Participants
+	if err := db.Model(&Participant{}).Count(&stats.Participants.Total).Error; err != nil {
+		log.Printf("Error counting participants: %v", err)
+	}
+	var participantSources []struct {
+		Source string
+		Count  int64
+	}
+	if err := db.Model(&Participant{}).Select("source, COUNT(*) as count").Group("source").Scan(&participantSources).Error; err != nil {
+		log.Printf("Error getting participant sources: %v", err)
+	} else {
+		for _, ps := range participantSources {
+			stats.Participants.BySource[ps.Source] = ps.Count
+		}
+	}
+
+	// Sessions
+	db.Model(&StudySession{}).Count(&stats.Sessions.Total)
+
+	// Font Preferences
+	var serifCount, sansCount int64
+	db.Model(&StudySession{}).Where("preferred_font_type = ?", "serif").Count(&serifCount)
+	db.Model(&StudySession{}).Where("preferred_font_type = ?", "sans").Count(&sansCount)
+	stats.FontPreferences.Serif = serifCount
+	stats.FontPreferences.Sans = sansCount
+	stats.FontPreferences.Total = serifCount + sansCount
+
+	// Quiz Performance
+	db.Model(&QuizResponse{}).Count(&stats.QuizPerformance.TotalResponses)
+	var correctCount int64
+	db.Model(&QuizResponse{}).Where("is_correct = ?", true).Count(&correctCount)
+	stats.QuizPerformance.CorrectAnswers = correctCount
+	if stats.QuizPerformance.TotalResponses > 0 {
+		stats.QuizPerformance.AverageAccuracy = float64(correctCount) / float64(stats.QuizPerformance.TotalResponses) * 100
+	}
+
+	// Quiz by question
+	var quizResults []struct {
+		QuestionID string
+		Total      int64
+		Correct    int64
+	}
+	if err := db.Model(&QuizResponse{}).Select("question_id, COUNT(*) as total, SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct").Group("question_id").Scan(&quizResults).Error; err != nil {
+		log.Printf("Error getting quiz results: %v", err)
+	} else {
+		for _, result := range quizResults {
+			accuracy := 0.0
+			if result.Total > 0 {
+				accuracy = float64(result.Correct) / float64(result.Total) * 100
+			}
+			stats.QuizPerformance.ByQuestion[result.QuestionID] = struct {
+				Total    int64   `json:"total"`
+				Correct  int64   `json:"correct"`
+				Accuracy float64 `json:"accuracy"`
+			}{Total: result.Total, Correct: result.Correct, Accuracy: accuracy}
+		}
+	}
+
+	// Reading Times
+	var avgSerif, avgSans float64
+	var sessionCount int64
+	db.Model(&StudySession{}).Where("time_left_ms > 0 OR time_right_ms > 0").Count(&sessionCount)
+	if sessionCount > 0 {
+		// Calculate average serif reading time
+		var serifTimes []int
+		db.Model(&StudySession{}).Where("font_left = ? AND time_left_ms > 0", "serif").Pluck("time_left_ms", &serifTimes)
+		db.Model(&StudySession{}).Where("font_right = ? AND time_right_ms > 0", "serif").Pluck("time_right_ms", &serifTimes)
+		if len(serifTimes) > 0 {
+			var sum int
+			for _, t := range serifTimes {
+				sum += t
+			}
+			avgSerif = float64(sum) / float64(len(serifTimes))
+		}
+		// Calculate average sans reading time
+		var sansTimes []int
+		db.Model(&StudySession{}).Where("font_left = ? AND time_left_ms > 0", "sans").Pluck("time_left_ms", &sansTimes)
+		db.Model(&StudySession{}).Where("font_right = ? AND time_right_ms > 0", "sans").Pluck("time_right_ms", &sansTimes)
+		if len(sansTimes) > 0 {
+			var sum int
+			for _, t := range sansTimes {
+				sum += t
+			}
+			avgSans = float64(sum) / float64(len(sansTimes))
+		}
+	}
+	stats.ReadingTimes.AverageSerif = avgSerif
+	stats.ReadingTimes.AverageSans = avgSans
+	stats.ReadingTimes.TotalSessions = sessionCount
+
+	// Accuracy Measurements
+	var avgAccuracy float64
+	var passedCount, failedCount int64
+	db.Model(&AccuracyMeasurement{}).Count(&stats.AccuracyMeasurements.Total)
+	db.Model(&AccuracyMeasurement{}).Select("AVG(accuracy)").Scan(&avgAccuracy)
+	db.Model(&AccuracyMeasurement{}).Where("passed = ?", true).Count(&passedCount)
+	db.Model(&AccuracyMeasurement{}).Where("passed = ?", false).Count(&failedCount)
+	stats.AccuracyMeasurements.AverageAccuracy = avgAccuracy
+	stats.AccuracyMeasurements.Passed = passedCount
+	stats.AccuracyMeasurements.Failed = failedCount
+
+	// Gaze Points
+	if err := db.Model(&GazePoint{}).Count(&stats.GazePoints.Total).Error; err != nil {
+		log.Printf("Error counting gaze points: %v", err)
+	}
+	var phaseCounts []struct {
+		Phase string
+		Count int64
+	}
+	if err := db.Model(&GazePoint{}).Select("phase, COUNT(*) as count").Where("phase IS NOT NULL AND phase != ''").Group("phase").Scan(&phaseCounts).Error; err != nil {
+		log.Printf("Error getting phase counts: %v", err)
+	} else {
+		for _, pc := range phaseCounts {
+			stats.GazePoints.ByPhase[pc.Phase] = pc.Count
+		}
+	}
+	var panelCounts []struct {
+		Panel string
+		Count int64
+	}
+	if err := db.Model(&GazePoint{}).Select("panel, COUNT(*) as count").Where("panel IS NOT NULL AND panel != ''").Group("panel").Scan(&panelCounts).Error; err != nil {
+		log.Printf("Error getting panel counts: %v", err)
+	} else {
+		for _, pc := range panelCounts {
+			stats.GazePoints.ByPanel[pc.Panel] = pc.Count
+		}
+	}
+
+	// Calibration Data
+	db.Model(&CalibrationData{}).Count(&stats.CalibrationData.Total)
+
+	return c.JSON(200, map[string]interface{}{
+		"success": true,
+		"data":    stats,
+	})
 }
 

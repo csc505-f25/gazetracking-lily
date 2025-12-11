@@ -766,6 +766,73 @@ export async function adminDeleteQuizQuestion(id: number): Promise<boolean> {
 }
 
 /**
+ * Admin: Get study statistics
+ */
+export interface Statistics {
+	participants: {
+		total: number;
+		by_source: Record<string, number>;
+	};
+	sessions: {
+		total: number;
+	};
+	font_preferences: {
+		serif: number;
+		sans: number;
+		total: number;
+	};
+	quiz_performance: {
+		total_responses: number;
+		correct_answers: number;
+		average_accuracy: number;
+		by_question: Record<
+			string,
+			{
+				total: number;
+				correct: number;
+				accuracy: number;
+			}
+		>;
+	};
+	reading_times: {
+		average_serif_ms: number;
+		average_sans_ms: number;
+		total_sessions: number;
+	};
+	accuracy_measurements: {
+		total: number;
+		average_accuracy: number;
+		passed: number;
+		failed: number;
+	};
+	gaze_points: {
+		total: number;
+		by_phase: Record<string, number>;
+		by_panel: Record<string, number>;
+	};
+	calibration_data: {
+		total: number;
+	};
+}
+
+export async function adminGetStatistics(): Promise<Statistics> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/admin/statistics`);
+		if (!response.ok) {
+			throw new Error(`Failed to fetch statistics: ${response.statusText}`);
+		}
+		const result: AdminApiResponse<Statistics> = await response.json();
+		if (result.success && result.data) {
+			return result.data;
+		}
+		throw new Error('Failed to fetch statistics');
+	} catch (error) {
+		console.error('Error fetching statistics:', error);
+		throw error;
+	}
+}
+
+/**
  * Collect all session data from sessionStorage and submit
  */
 export async function submitCompleteSession(quizAnswers: Record<string, number>): Promise<boolean> {
