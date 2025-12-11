@@ -69,10 +69,33 @@ test_endpoint "Admin: List Study Texts" "GET" "/api/admin/study-text" ""
 
 # Test 2b: Admin - Create Study Text
 ADMIN_STUDY_TEXT_DATA='{"version":"test","content":"Test passage for endpoint testing","font_left":"serif","font_right":"sans","active":false}'
+ADMIN_STUDY_TEXT_RESPONSE=$(curl -s -X POST \
+    -H "Content-Type: application/json" \
+    -d "$ADMIN_STUDY_TEXT_DATA" \
+    "${BASE_URL}/api/admin/study-text")
+ADMIN_STUDY_TEXT_ID=$(echo "$ADMIN_STUDY_TEXT_RESPONSE" | jq -r '.id' 2>/dev/null)
 test_endpoint "Admin: Create Study Text" "POST" "/api/admin/study-text" "$ADMIN_STUDY_TEXT_DATA"
+
+if [ -z "$ADMIN_STUDY_TEXT_ID" ] || [ "$ADMIN_STUDY_TEXT_ID" = "null" ]; then
+    echo -e "${YELLOW}⚠ Warning: Could not get study text ID. Using ID 1 for remaining tests.${NC}"
+    ADMIN_STUDY_TEXT_ID=1
+fi
+echo "  Using Study Text ID: $ADMIN_STUDY_TEXT_ID"
+echo ""
+
+# Test 2c: Admin - Update Study Text
+ADMIN_STUDY_TEXT_UPDATE_DATA="{
+    \"id\": $ADMIN_STUDY_TEXT_ID,
+    \"content\": \"Updated test passage for endpoint testing\",
+    \"font_left\": \"sans\",
+    \"font_right\": \"serif\"
+}"
+test_endpoint "Admin: Update Study Text" "PUT" "/api/admin/study-text" "$ADMIN_STUDY_TEXT_UPDATE_DATA"
 
 # Test 3: Fetch Quiz Questions
 test_endpoint "Fetch Quiz Questions" "GET" "/api/quiz-questions" ""
+test_endpoint "Fetch Quiz Questions (with study_text_id)" "GET" "/api/quiz-questions?study_text_id=1" ""
+# Note: passage_id test will be added after passage is created (see Test 13)
 
 # Test 4: Create Participant
 PARTICIPANT_DATA='{"source": "test"}'
@@ -189,6 +212,7 @@ test_endpoint "Submit Reading Event" "POST" "/api/reading-event" "$READING_EVENT
 
 # Test 11: Admin - Get Quiz Question
 test_endpoint "Admin: Get Quiz Question" "GET" "/api/admin/quiz-question?id=1" ""
+test_endpoint "Admin: Get Quiz Questions by study_text_id" "GET" "/api/admin/quiz-question?study_text_id=1" ""
 
 # Test 12: Admin - Create Quiz Question
 ADMIN_QUIZ_DATA='{
@@ -199,7 +223,50 @@ ADMIN_QUIZ_DATA='{
     "answer": 0,
     "order": 99
 }'
+ADMIN_QUIZ_RESPONSE=$(curl -s -X POST \
+    -H "Content-Type: application/json" \
+    -d "$ADMIN_QUIZ_DATA" \
+    "${BASE_URL}/api/admin/quiz-question")
+ADMIN_QUIZ_ID=$(echo "$ADMIN_QUIZ_RESPONSE" | jq -r '.id' 2>/dev/null)
 test_endpoint "Admin: Create Quiz Question" "POST" "/api/admin/quiz-question" "$ADMIN_QUIZ_DATA"
+
+if [ -z "$ADMIN_QUIZ_ID" ] || [ "$ADMIN_QUIZ_ID" = "null" ]; then
+    echo -e "${YELLOW}⚠ Warning: Could not get quiz question ID. Using ID 1 for remaining tests.${NC}"
+    ADMIN_QUIZ_ID=1
+fi
+echo "  Using Quiz Question ID: $ADMIN_QUIZ_ID"
+echo ""
+
+# Test 12a: Admin - Update Quiz Question
+ADMIN_QUIZ_UPDATE_DATA="{
+    \"id\": $ADMIN_QUIZ_ID,
+    \"prompt\": \"Updated test question?\",
+    \"choices\": [\"Option 1\", \"Option 2\", \"Option 3\", \"Option 4\"],
+    \"answer\": 1,
+    \"order\": 100
+}"
+test_endpoint "Admin: Update Quiz Question" "PUT" "/api/admin/quiz-question" "$ADMIN_QUIZ_UPDATE_DATA"
+
+# Test 12b: Admin - Delete Quiz Question (create a new one first to delete)
+ADMIN_QUIZ_DELETE_DATA='{
+    "study_text_id": 1,
+    "question_id": "q_test_delete",
+    "prompt": "This question will be deleted",
+    "choices": ["A", "B"],
+    "answer": 0,
+    "order": 999
+}'
+DELETE_QUIZ_RESPONSE=$(curl -s -X POST \
+    -H "Content-Type: application/json" \
+    -d "$ADMIN_QUIZ_DELETE_DATA" \
+    "${BASE_URL}/api/admin/quiz-question")
+DELETE_QUIZ_ID=$(echo "$DELETE_QUIZ_RESPONSE" | jq -r '.id' 2>/dev/null)
+if [ -n "$DELETE_QUIZ_ID" ] && [ "$DELETE_QUIZ_ID" != "null" ]; then
+    test_endpoint "Admin: Delete Quiz Question" "DELETE" "/api/admin/quiz-question?id=$DELETE_QUIZ_ID" ""
+else
+    echo -e "${YELLOW}⚠ Warning: Could not create quiz question for deletion test. Skipping delete test.${NC}"
+    echo ""
+fi
 
 # Test 13: Admin - Create Passage
 # First, get a study text ID (use the default one, which should be ID 1)
@@ -231,6 +298,9 @@ test_endpoint "Admin: Get Passages by Study Text ID" "GET" "/api/admin/passage?s
 
 # Test 15: Admin - Get Single Passage by ID
 test_endpoint "Admin: Get Single Passage" "GET" "/api/admin/passage?id=$PASSAGE_ID" ""
+
+# Test 15a: Fetch Quiz Questions (with passage_id) - now that we have a passage
+test_endpoint "Fetch Quiz Questions (with passage_id)" "GET" "/api/quiz-questions?passage_id=$PASSAGE_ID" ""
 
 # Test 16: Admin - Update Passage
 ADMIN_PASSAGE_UPDATE_DATA="{

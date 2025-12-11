@@ -11,7 +11,10 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
-		"lint": "prettier --check . && eslint ."
+		"lint": "prettier --check . && eslint .",
+		"test": "vitest",
+		"test:ui": "vitest --ui",
+		"test:run": "vitest run"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.4.0",
@@ -23,6 +26,7 @@
 		"@tailwindcss/typography": "^0.5.19",
 		"@tailwindcss/vite": "^4.1.14",
 		"@types/node": "^22",
+		"@vitest/ui": "^2.1.8",
 		"eslint": "^9.38.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.12.4",
@@ -35,7 +39,8 @@
 		"tailwindcss": "^4.1.14",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.46.1",
-		"vite": "^7.1.10"
+		"vite": "^7.1.10",
+		"vitest": "^2.1.8"
 	},
 	"dependencies": {
 		"webgazer": "^3.4.0"
