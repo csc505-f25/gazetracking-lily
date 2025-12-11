@@ -7,12 +7,12 @@
   import { ReadingPanel } from '$lib/components/reading';
   import { webgazerStore } from '$lib/stores/webgazer';
   import {
-    initializeTournament,
-    recordMatchResult,
-    getCurrentMatch,
+    initializeComparisons,
+    recordComparisonResult,
+    getCurrentComparison,
     getFontInfo,
     FONT_POOL,
-    type TournamentState,
+    type FontComparisonState,
     type FontName
   } from '$lib/fonts';
 
@@ -28,9 +28,9 @@
   let showInstructionModal = false;
   let showQuizTransitionModal = false;
   
-  // Tournament state
-  let tournament: TournamentState | null = null;
-  let currentMatch: ReturnType<typeof getCurrentMatch> = null;
+  // Font comparison state
+  let comparisonState: FontComparisonState | null = null;
+  let currentComparison: ReturnType<typeof getCurrentComparison> = null;
   
   // Passage management (for reading content)
   let passages: Passage[] = [];
@@ -39,14 +39,14 @@
   let currentScreen = 1; // Track which screen (1-4) for current passage
   const SCREENS_PER_PASSAGE = 4;
   
-  // Store tournament results
-  let matchResults: Array<{
-    matchId: string;
+  // Store comparison results
+  let comparisonResults: Array<{
+    comparisonId: string;
     round: number;
     bracket: string;
     fontA: FontName;
     fontB: FontName;
-    winner: FontName;
+    preferred: FontName;
     timeA: number;
     timeB: number;
   }> = [];
@@ -72,9 +72,9 @@
       sessionDbId = parseInt(sessionIdStr, 10);
     }
 
-    // Initialize tournament
-    tournament = initializeTournament();
-    currentMatch = getCurrentMatch(tournament);
+    // Initialize font comparisons
+    comparisonState = initializeComparisons();
+    currentComparison = getCurrentComparison(comparisonState);
 
     const textData = await fetchStudyText();
     if (textData) {
@@ -141,7 +141,7 @@
       });
     }
 
-    // Show instruction modal for first match
+    // Show instruction modal for first comparison
     showInstructionModal = true;
   });
 
@@ -286,46 +286,46 @@
   }
 
   async function selectFontPreference(preference: 'A' | 'B') {
-    if (!currentMatch || !tournament || fontPreference !== null) return;
+    if (!currentComparison || !comparisonState || fontPreference !== null) return;
     
     await submitBufferedGazePoints();
     
     fontPreference = preference;
-    const winner = preference === 'A' ? currentMatch.fontA! : currentMatch.fontB!;
+    const preferred = preference === 'A' ? currentComparison.fontA! : currentComparison.fontB!;
     
-    // Store match info before updating tournament
-    const matchId = currentMatch.id;
-    const matchRound = currentMatch.round;
-    const matchBracket = currentMatch.bracket;
-    const matchFontA = currentMatch.fontA!;
-    const matchFontB = currentMatch.fontB!;
+    // Store comparison info before updating state
+    const comparisonId = currentComparison.id;
+    const comparisonRound = currentComparison.round;
+    const comparisonBracket = currentComparison.bracket;
+    const comparisonFontA = currentComparison.fontA!;
+    const comparisonFontB = currentComparison.fontB!;
     
-    // Record match result
-    tournament = recordMatchResult(tournament, matchId, winner);
-    currentMatch = getCurrentMatch(tournament);
+    // Record comparison result
+    comparisonState = recordComparisonResult(comparisonState, comparisonId, preferred);
+    currentComparison = getCurrentComparison(comparisonState);
     
-    // Store match result
-    matchResults.push({
-      matchId: matchId,
-      round: matchRound,
-      bracket: matchBracket,
-      fontA: matchFontA,
-      fontB: matchFontB,
-      winner: winner,
+    // Store comparison result
+    comparisonResults.push({
+      comparisonId: comparisonId,
+      round: comparisonRound,
+      bracket: comparisonBracket,
+      fontA: comparisonFontA,
+      fontB: comparisonFontB,
+      preferred: preferred,
       timeA: timeA,
       timeB: timeB
     });
     
     // Store in sessionStorage
-    const matchKey = `match_${matchId}`;
-    sessionStorage.setItem(`${matchKey}_winner`, winner);
-    sessionStorage.setItem(`${matchKey}_timeA`, String(timeA));
-    sessionStorage.setItem(`${matchKey}_timeB`, String(timeB));
+    const comparisonKey = `comparison_${comparisonId}`;
+    sessionStorage.setItem(`${comparisonKey}_preferred`, preferred);
+    sessionStorage.setItem(`${comparisonKey}_timeA`, String(timeA));
+    sessionStorage.setItem(`${comparisonKey}_timeB`, String(timeB));
     
-    // Check if tournament is complete
-    if (tournament.finalWinner) {
-      // Tournament complete - save all results
-      saveTournamentResults();
+    // Check if comparison is complete
+    if (comparisonState.finalPreferred) {
+      // Comparison complete - save all results
+      saveComparisonResults();
       
       // Check if we've completed 4 screens for current passage
       if (currentScreen >= SCREENS_PER_PASSAGE) {
@@ -336,18 +336,18 @@
         // Move to next screen of same passage
         currentScreen++;
         sessionStorage.setItem('current_screen', String(currentScreen));
-        // Reset for next screen (same passage, new match)
+        // Reset for next screen (same passage, new comparison)
         setTimeout(() => {
-          resetForNextMatch();
+          resetForNextComparison();
         }, 1000);
         return;
       }
     }
     
-    // Tournament not complete yet - check if we've done 4 screens for current passage
+    // Comparison not complete yet - check if we've done 4 screens for current passage
     if (currentScreen >= SCREENS_PER_PASSAGE) {
-      // 4 screens done, but tournament not complete - show transition modal
-      // (tournament will continue after quiz)
+      // 4 screens done, but comparison not complete - show transition modal
+      // (comparison will continue after quiz)
       showQuizTransitionModal = true;
       return;
     }
@@ -356,13 +356,13 @@
     currentScreen++;
     sessionStorage.setItem('current_screen', String(currentScreen));
     
-    // Reset for next match (next screen of same passage)
+    // Reset for next comparison (next screen of same passage)
     setTimeout(() => {
-      resetForNextMatch();
+      resetForNextComparison();
     }, 1000);
   }
 
-  function resetForNextMatch() {
+  function resetForNextComparison() {
     started = false;
     doneA = false;
     doneB = false;
@@ -372,24 +372,24 @@
     t0 = 0;
   }
 
-  function saveTournamentResults() {
-    // Save tournament data to sessionStorage
-    sessionStorage.setItem('tournament_results', JSON.stringify(matchResults));
-    sessionStorage.setItem('tournament_winner', tournament?.finalWinner || '');
-    sessionStorage.setItem('tournament_eliminated', JSON.stringify(tournament?.eliminated || []));
+  function saveComparisonResults() {
+    // Save comparison data to sessionStorage
+    sessionStorage.setItem('comparison_results', JSON.stringify(comparisonResults));
+    sessionStorage.setItem('comparison_final_preferred', comparisonState?.finalPreferred || '');
+    sessionStorage.setItem('comparison_eliminated', JSON.stringify(comparisonState?.eliminated || []));
     
     // Also save in legacy format for backward compatibility
-    if (matchResults.length > 0) {
-      const lastMatch = matchResults[matchResults.length - 1];
-      sessionStorage.setItem('font_preference', lastMatch.winner === lastMatch.fontA ? 'A' : 'B');
-      sessionStorage.setItem('font_preferred_type', getFontInfo(lastMatch.winner).displayName);
-      sessionStorage.setItem('timeA_ms', String(lastMatch.timeA));
-      sessionStorage.setItem('timeB_ms', String(lastMatch.timeB));
+    if (comparisonResults.length > 0) {
+      const lastComparison = comparisonResults[comparisonResults.length - 1];
+      sessionStorage.setItem('font_preference', lastComparison.preferred === lastComparison.fontA ? 'A' : 'B');
+      sessionStorage.setItem('font_preferred_type', getFontInfo(lastComparison.preferred).displayName);
+      sessionStorage.setItem('timeA_ms', String(lastComparison.timeA));
+      sessionStorage.setItem('timeB_ms', String(lastComparison.timeB));
     }
   }
 
-  $: currentFontA = currentMatch?.fontA ? getFontInfo(currentMatch.fontA) : null;
-  $: currentFontB = currentMatch?.fontB ? getFontInfo(currentMatch.fontB) : null;
+  $: currentFontA = currentComparison?.fontA ? getFontInfo(currentComparison.fontA) : null;
+  $: currentFontB = currentComparison?.fontB ? getFontInfo(currentComparison.fontB) : null;
 
 </script>
 
@@ -431,7 +431,7 @@
         <div class="space-y-4">
           <h1 class="text-4xl font-bold text-gray-900 mb-4">All Passages Complete!</h1>
           <p class="text-2xl text-gray-700 mb-2">
-            {tournament?.finalWinner ? `Font Winner: ${getFontInfo(tournament.finalWinner).displayName}` : 'Thank you for participating!'}
+            {comparisonState?.finalPreferred ? `Preferred Font: ${getFontInfo(comparisonState.finalPreferred).displayName}` : 'Thank you for participating!'}
           </p>
           <p class="text-lg text-gray-500">You have finished reading all passages.</p>
         </div>
@@ -456,10 +456,10 @@
               sessionStorage.removeItem('timeB_ms');
               sessionStorage.removeItem('font_preference');
               sessionStorage.removeItem('font_preferred_type');
-              // Clear tournament data
+              // Clear comparison data
               const keys = Object.keys(sessionStorage);
               keys.forEach(key => {
-                if (key.startsWith('match_') || key.startsWith('tournament_')) {
+                if (key.startsWith('comparison_') || key.startsWith('comparison_')) {
                   sessionStorage.removeItem(key);
                 }
               });
@@ -472,7 +472,7 @@
         </div>
       </div>
     </div>
-  {:else if currentMatch && currentPassage}
+  {:else if currentComparison && currentPassage}
     <div class="flex-1 flex flex-col items-center justify-center px-8 py-10 bg-gray-100">
       <div class="flex-1 w-full flex flex-col items-center justify-center gap-8 px-8">
         <div class="text-center mb-6">
@@ -488,7 +488,7 @@
             <ReadingPanel
               class="bg-white border-1 border-gray-200 w-full"
               label="Font A"
-              fontName={currentMatch.fontA!}
+              fontName={currentComparison.fontA!}
               text={currentPassage.content}
             />
             <button
@@ -506,7 +506,7 @@
             <ReadingPanel
               class="bg-white border-1 border-gray-200 w-full"
               label="Font B"
-              fontName={currentMatch.fontB!}
+              fontName={currentComparison.fontB!}
               text={currentPassage.content}
             />
             <button
@@ -523,7 +523,7 @@
     </div>
   {:else}
     <div class="flex-1 flex items-center justify-center">
-      <p class="text-gray-500">No match available. Please refresh the page.</p>
+      <p class="text-gray-500">No comparison available. Please refresh the page.</p>
     </div>
   {/if}
 </div>

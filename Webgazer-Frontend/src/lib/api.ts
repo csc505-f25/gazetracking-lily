@@ -345,6 +345,426 @@ export async function fetchQuizQuestions(
 	}
 }
 
+// ============================================================================
+// Admin API Functions
+// ============================================================================
+
+export interface AdminStudyText {
+	id: number;
+	version: string;
+	content: string;
+	font_left?: string;
+	font_right?: string;
+	active: boolean;
+	created_at?: string;
+	updated_at?: string;
+}
+
+export interface AdminPassage {
+	id: number;
+	study_text_id: number;
+	order: number;
+	content: string;
+	title?: string;
+	font_left?: string;
+	font_right?: string;
+}
+
+export interface AdminQuizQuestion {
+	id: number;
+	study_text_id: number;
+	passage_id?: number;
+	question_id: string;
+	prompt: string;
+	choices: string[];
+	answer: number;
+	order: number;
+}
+
+export interface AdminApiResponse<T = any> {
+	success: boolean;
+	data?: T;
+	error?: string;
+}
+
+/**
+ * Admin: List all study texts
+ */
+export async function adminListStudyTexts(): Promise<AdminStudyText[]> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/admin/study-text`);
+		if (!response.ok) {
+			throw new Error(`Failed to fetch study texts: ${response.statusText}`);
+		}
+		const result: AdminApiResponse<AdminStudyText[]> = await response.json();
+		if (result.success && result.data) {
+			return result.data;
+		}
+		throw new Error(result.error || 'Failed to fetch study texts');
+	} catch (error) {
+		console.error('Error fetching study texts:', error);
+		throw error;
+	}
+}
+
+/**
+ * Admin: Create a new study text
+ */
+export async function adminCreateStudyText(data: {
+	version?: string;
+	content: string;
+	font_left?: string;
+	font_right?: string;
+	active?: boolean;
+}): Promise<AdminStudyText> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/admin/study-text`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(data)
+		});
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(`Failed to create study text: ${errorText}`);
+		}
+		const result: any = await response.json();
+		if (result.success) {
+			// Backend returns {success: true, id: ...}, so fetch the created item
+			if (result.id) {
+				const studyTexts = await adminListStudyTexts();
+				const created = studyTexts.find((st) => st.id === result.id);
+				if (created) return created;
+			}
+			// Fallback: reload all and return the most recent
+			const studyTexts = await adminListStudyTexts();
+			return studyTexts[0];
+		}
+		throw new Error(result.error || 'Failed to create study text');
+	} catch (error) {
+		console.error('Error creating study text:', error);
+		throw error;
+	}
+}
+
+/**
+ * Admin: Update a study text
+ */
+export async function adminUpdateStudyText(data: {
+	id: number;
+	version?: string;
+	content?: string;
+	font_left?: string;
+	font_right?: string;
+	active?: boolean;
+}): Promise<AdminStudyText> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/admin/study-text`, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(data)
+		});
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(`Failed to update study text: ${errorText}`);
+		}
+		const result: any = await response.json();
+		if (result.success) {
+			// Backend returns {success: true, id: ...}, so fetch the updated item
+			const studyTexts = await adminListStudyTexts();
+			const updated = studyTexts.find((st) => st.id === data.id);
+			if (updated) return updated;
+			throw new Error('Updated study text not found after update');
+		}
+		throw new Error(result.error || 'Failed to update study text');
+	} catch (error) {
+		console.error('Error updating study text:', error);
+		throw error;
+	}
+}
+
+/**
+ * Admin: List passages for a study text
+ */
+export async function adminListPassages(studyTextId?: number): Promise<AdminPassage[]> {
+	try {
+		let url = `${API_BASE_URL}/api/admin/passage`;
+		if (studyTextId) {
+			url += `?study_text_id=${studyTextId}`;
+		}
+		const response = await fetch(url);
+		if (!response.ok) {
+			throw new Error(`Failed to fetch passages: ${response.statusText}`);
+		}
+		const result: AdminApiResponse<AdminPassage[]> = await response.json();
+		if (result.success && result.data) {
+			return result.data;
+		}
+		return [];
+	} catch (error) {
+		console.error('Error fetching passages:', error);
+		throw error;
+	}
+}
+
+/**
+ * Admin: Get a single passage by ID
+ */
+export async function adminGetPassage(id: number): Promise<AdminPassage | null> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/admin/passage?id=${id}`);
+		if (!response.ok) {
+			throw new Error(`Failed to fetch passage: ${response.statusText}`);
+		}
+		const result: AdminApiResponse<AdminPassage> = await response.json();
+		if (result.success && result.data) {
+			return result.data;
+		}
+		return null;
+	} catch (error) {
+		console.error('Error fetching passage:', error);
+		throw error;
+	}
+}
+
+/**
+ * Admin: Create a new passage
+ */
+export async function adminCreatePassage(data: {
+	study_text_id: number;
+	order?: number;
+	title?: string;
+	content: string;
+	font_left?: string;
+	font_right?: string;
+}): Promise<AdminPassage> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/admin/passage`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(data)
+		});
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(`Failed to create passage: ${errorText}`);
+		}
+		const result: any = await response.json();
+		if (result.success) {
+			// Backend returns {success: true, id: ...}, so fetch the created item
+			if (result.id) {
+				const created = await adminGetPassage(result.id);
+				if (created) return created;
+			}
+			throw new Error('Created passage not found after creation');
+		}
+		throw new Error(result.error || 'Failed to create passage');
+	} catch (error) {
+		console.error('Error creating passage:', error);
+		throw error;
+	}
+}
+
+/**
+ * Admin: Update a passage
+ */
+export async function adminUpdatePassage(data: {
+	id: number;
+	title?: string;
+	content?: string;
+	order?: number;
+	font_left?: string;
+	font_right?: string;
+}): Promise<AdminPassage> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/admin/passage`, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(data)
+		});
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(`Failed to update passage: ${errorText}`);
+		}
+		const result: any = await response.json();
+		if (result.success) {
+			// Backend returns {success: true, id: ...}, so fetch the updated item
+			const updated = await adminGetPassage(data.id);
+			if (updated) return updated;
+			throw new Error('Updated passage not found after update');
+		}
+		throw new Error(result.error || 'Failed to update passage');
+	} catch (error) {
+		console.error('Error updating passage:', error);
+		throw error;
+	}
+}
+
+/**
+ * Admin: Delete a passage
+ */
+export async function adminDeletePassage(id: number): Promise<boolean> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/admin/passage?id=${id}`, {
+			method: 'DELETE'
+		});
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(`Failed to delete passage: ${errorText}`);
+		}
+		const result: AdminApiResponse = await response.json();
+		return result.success || false;
+	} catch (error) {
+		console.error('Error deleting passage:', error);
+		throw error;
+	}
+}
+
+/**
+ * Admin: List quiz questions
+ */
+export async function adminListQuizQuestions(
+	studyTextId?: number,
+	passageId?: number
+): Promise<AdminQuizQuestion[]> {
+	try {
+		let url = `${API_BASE_URL}/api/admin/quiz-question`;
+		const params = new URLSearchParams();
+		if (passageId) {
+			params.append('passage_id', String(passageId));
+		} else if (studyTextId) {
+			params.append('study_text_id', String(studyTextId));
+		}
+		if (params.toString()) {
+			url += `?${params.toString()}`;
+		}
+		const response = await fetch(url);
+		if (!response.ok) {
+			throw new Error(`Failed to fetch quiz questions: ${response.statusText}`);
+		}
+		const result: AdminApiResponse<AdminQuizQuestion[]> = await response.json();
+		if (result.success && result.data) {
+			return Array.isArray(result.data) ? result.data : [result.data];
+		}
+		return [];
+	} catch (error) {
+		console.error('Error fetching quiz questions:', error);
+		throw error;
+	}
+}
+
+/**
+ * Admin: Get a single quiz question by ID
+ */
+export async function adminGetQuizQuestion(id: number): Promise<AdminQuizQuestion | null> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/admin/quiz-question?id=${id}`);
+		if (!response.ok) {
+			throw new Error(`Failed to fetch quiz question: ${response.statusText}`);
+		}
+		const result: AdminApiResponse<AdminQuizQuestion> = await response.json();
+		if (result.success && result.data) {
+			return result.data;
+		}
+		return null;
+	} catch (error) {
+		console.error('Error fetching quiz question:', error);
+		throw error;
+	}
+}
+
+/**
+ * Admin: Create a new quiz question
+ */
+export async function adminCreateQuizQuestion(data: {
+	study_text_id: number;
+	passage_id?: number;
+	question_id: string;
+	prompt: string;
+	choices: string[];
+	answer: number;
+	order?: number;
+}): Promise<AdminQuizQuestion> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/admin/quiz-question`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(data)
+		});
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(`Failed to create quiz question: ${errorText}`);
+		}
+		const result: any = await response.json();
+		if (result.success) {
+			// Backend returns {success: true, id: ...}, so fetch the created item
+			if (result.id) {
+				const created = await adminGetQuizQuestion(result.id);
+				if (created) return created;
+			}
+			throw new Error('Created quiz question not found after creation');
+		}
+		throw new Error(result.error || 'Failed to create quiz question');
+	} catch (error) {
+		console.error('Error creating quiz question:', error);
+		throw error;
+	}
+}
+
+/**
+ * Admin: Update a quiz question
+ */
+export async function adminUpdateQuizQuestion(data: {
+	id: number;
+	passage_id?: number | null;
+	question_id?: string;
+	prompt?: string;
+	choices?: string[];
+	answer?: number;
+	order?: number;
+}): Promise<AdminQuizQuestion> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/admin/quiz-question`, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(data)
+		});
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(`Failed to update quiz question: ${errorText}`);
+		}
+		const result: any = await response.json();
+		if (result.success) {
+			// Backend returns {success: true, id: ...}, so fetch the updated item
+			const updated = await adminGetQuizQuestion(data.id);
+			if (updated) return updated;
+			throw new Error('Updated quiz question not found after update');
+		}
+		throw new Error(result.error || 'Failed to update quiz question');
+	} catch (error) {
+		console.error('Error updating quiz question:', error);
+		throw error;
+	}
+}
+
+/**
+ * Admin: Delete a quiz question
+ */
+export async function adminDeleteQuizQuestion(id: number): Promise<boolean> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/admin/quiz-question?id=${id}`, {
+			method: 'DELETE'
+		});
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(`Failed to delete quiz question: ${errorText}`);
+		}
+		const result: AdminApiResponse = await response.json();
+		return result.success || false;
+	} catch (error) {
+		console.error('Error deleting quiz question:', error);
+		throw error;
+	}
+}
+
 /**
  * Collect all session data from sessionStorage and submit
  */

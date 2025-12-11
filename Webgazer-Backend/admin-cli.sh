@@ -247,12 +247,12 @@ list_quiz_questions() {
         text_id=$(echo "$text_json" | jq -r '.id')
         text_version=$(echo "$text_json" | jq -r '.version')
         
-        questions=$(api_get "/api/quiz-questions?study_text_id=$text_id")
+        questions=$(api_get "/api/admin/quiz-question?study_text_id=$text_id")
         
-        if echo "$questions" | jq -e '. | length > 0' > /dev/null 2>&1; then
+        if echo "$questions" | jq -e '.success' > /dev/null 2>&1 && echo "$questions" | jq -e '.data | length > 0' > /dev/null 2>&1; then
             echo ""
             show_info "Study Text: $text_version (ID: $text_id)"
-            echo "$questions" | jq -r '.[] | "  ID: \(.id) | Q: \(.id) | Prompt: \(.prompt[0:40])... | Answer: \(.choices[.answer])"'
+            echo "$questions" | jq -r '.data[] | "  ID: \(.id) | Q: \(.question_id) | Prompt: \(.prompt[0:40])... | Answer: \(.choices[.answer])"'
         fi
     done
 }
